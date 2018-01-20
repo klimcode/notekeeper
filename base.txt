@@ -1,0 +1,50 @@
+
+___php, ___html_tags
+
+Way to display PHP source code in html
+"
+echo '<xmp>';
+echo file_get_contents(__FILE__);
+echo '</xmp>';
+"
+
+============================
+
+___css, ___mobile, ___breakpoints
+
+Source: https://material.io/devices/
+Screen Width
+    320px: Iphone 4, 4s, 5, 5s, 5c, 5se. Galaxy s3, s4, s5, note3
+    360px*: Galaxy s6. Pixel, Pixel Xl. HTC One
+    375px*: Iphone 6, 6s, 7, 8, X
+    414px: Iphone 6+, 7+, 8+
+    480px: WinPhone
+    540px: Sony Xperia C4, Z Ultra
+
+    541px breakpoint --------------
+
+    600px: Nexus 7
+    768px*: Ipad 1, 2, 3, 4, mini, air, pro 9.7, Nexus 9
+    800px: Galaxy tab 2, S. Kindle Fire HD 7, Nexus 10
+    834px: Ipad pro 10.5
+    960px: Sony Xperia Z3 Tablet
+
+    961px breakpoint -------------
+
+    1024px: Nexus 9
+    1280px: Nexus 10, Sony Xperia Z4 Tablet, Macbook 12, Chromebook Pixel
+    1366px: Ipad pro 12.9, notebooks...
+    1368px: Surface pro 4
+
+    1370px breakpoint ------------
+
+    1440px: Macbook Air 13, 15
+    2560px: Chromebook 30, iMac 27, 5k
+
+    * means most usable devices
+
+============================
+
+___js, ___js_oop
+
+============================
