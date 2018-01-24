@@ -1,9 +1,10 @@
-const Flow = require('flow');
-const FILE = require('files');
-const UTIL = require('utilities');
+const PATH = require('path');
+const Flow = require('flow-code-description');
+const FILE = require('fs-handy-wraps');
+const UTIL = require('./utilities');
 
-const pathToConfig = 'config.json';
-const pathToInterface = 'interface.txt';
+const configFilename = 'config.json';
+const interfaceFilename = 'interface.txt';
 const mainFLOW = new Flow();
 global.storage = {};
 
@@ -11,11 +12,11 @@ global.storage = {};
 
 mainFLOW.steps = {
     'start': getConfig,
-    'config is OK': [ openTextEditor, getDatabase ],
+    'config is OK': getDatabase,
     'database is OK': parseTagsFromBase,
     'tags are parsed': createInterface,
     'interface created': updateInterface,
-    'interface is recorded in Notefile': watchInterfaceChanges,
+    'interface is recorded in Notefile': [ watchInterfaceChanges, openTextEditor ],
     'note was changed': closeApp,
 
     'problem with interface': writeMessageToInterface,
@@ -28,6 +29,7 @@ mainFLOW.to('start');
 
 
 function getConfig() {
+    const pathToConfig = PATH.resolve(__dirname, configFilename);
     console.log(`trying to read: ${pathToConfig}`);
     FILE.getConfig(
         pathToConfig,
@@ -38,11 +40,11 @@ function getDatabase() {
     console.log(`trying to read database: ${storage.config.dbPath}`);
     FILE.readOrMake(
         storage.config.dbPath,
-        (content) => { storage.db = content; mainFLOW.to('database is OK') }
+        (content) => { mainFLOW.to('database is OK', content) }
     );
 }
-function parseTagsFromBase() {
-    let tags = storage.db.match(/\b___\w+/g);
+function parseTagsFromBase(dbContent) {
+    let tags = dbContent.match(/\b___\w+/g);
     if (tags) {
         tags = UTIL.removeClonesFrom(tags);
     } else {
@@ -53,7 +55,8 @@ function parseTagsFromBase() {
     mainFLOW.to('tags are parsed', tags);
 }
 function createInterface(tagsFromBase) {
-    console.log(`trying to create text interface in: ${storage.config.tempPath}`);
+    const pathToInterface = PATH.resolve(__dirname, interfaceFilename);
+    console.log(`trying to read text interface from: ${pathToInterface}`);
 
 
     FILE.readOrMake(
@@ -137,6 +140,8 @@ function watchInterfaceChanges(interface) {
         storage.isWatchingStarted = true;
 
         FILE.watch(noteFile, readNoteFile);
+
+        console.log('watching on Note File...')
     }
 
 
@@ -210,16 +215,16 @@ function removeMessageFromInterface(content) {
 }
 
 
-function openTextEditor(config) {
+function openTextEditor() {
+    const config = storage.config;
     const PATH = require('path');
     const SPAWN = require('child_process').spawn;
 
-    const dir = process.cwd();
-    const filePath = PATH.resolve(dir, config.tempPath);
-    console.log(`trying to open Text Editor by command: ${config.editor} ${filePath}`);
+
+    console.log(`trying to open Text Editor by command: ${config.editor} ${config.tempPath}`);
 
 
-    let child = SPAWN(config.editor, [filePath]);
+    let child = SPAWN(config.editor, [config.tempPath]);
     let resp = '';
 
     child.stdout.on('data', (buffer) => { resp += buffer.toString() });

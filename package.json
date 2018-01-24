@@ -1,0 +1,28 @@
+{
+  "name": "notekeeper",
+  "version": "2.0.0",
+  "description": "A simple utility for making notes",
+  "main": "notekeeper.js",
+  "dependencies": {
+    "flow-code-description": "^1.0.0",
+    "fs-handy-wraps": "^1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anilator/notekeeper.git"
+  },
+  "keywords": [
+    "notes",
+    "utility"
+  ],
+  "author": "Evgenii Klimov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Anilator/notekeeper/issues"
+  },
+  "homepage": "https://github.com/Anilator/notekeeper#readme"
+}
