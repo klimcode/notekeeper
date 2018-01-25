@@ -1,8 +1,12 @@
 {
   "name": "notekeeper",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "A simple utility for making notes",
   "main": "notekeeper.js",
+  "bin": {
+    "notekeeper": "notekeeper.js"
+  },
+  "preferGlobal": true,
   "dependencies": {
     "flow-code-description": "^1.0.0",
     "fs-handy-wraps": "^1.0.0"

@@ -1,9 +1,12 @@
+#!/usr/bin/env node
+
 const PATH = require('path');
 const Flow = require('flow-code-description');
 const FILE = require('fs-handy-wraps');
 const UTIL = require('./utilities');
+const HOMEDIR = require('os').homedir();
 
-const configFilename = 'config.json';
+const configFilename = 'notekeeper_config.json';
 const interfaceFilename = 'interface.txt';
 const mainFLOW = new Flow(true);
 global.storage = {};
@@ -31,7 +34,7 @@ mainFLOW.to('start');
 
 
 function getConfig() {
-    const pathToConfig = PATH.resolve(__dirname, configFilename);
+    const pathToConfig = PATH.join( HOMEDIR, 'notekeeper_config.json' );
     console.log(`trying to read config: ${pathToConfig}`);
     FILE.getConfig(
         pathToConfig,
@@ -57,7 +60,7 @@ function parseTagsFromBase(dbContent) {
     mainFLOW.to('tags are parsed from database', tags);
 }
 function createInterface(tagsFromBase) {
-    const pathToInterface = PATH.resolve(__dirname, interfaceFilename);
+    const pathToInterface = PATH.join( HOMEDIR, interfaceFilename );
     console.log(`trying to read text interface from file: ${pathToInterface}`);
 
 
@@ -78,7 +81,7 @@ function createInterface(tagsFromBase) {
         interface +=    `\n================================ commands ====================================\n`;
         interface +=    `<commands>save<>`;
         interface +=    `\n============================ tags used previously ============================\n`;
-        interface +=    `<tags_used><>`;
+        interface +=    `<tags_used>___sometag<>`;
 
         FILE.write(
             pathToInterface,
@@ -232,7 +235,6 @@ function openTextEditor() {
 
 
     const config = storage.config;
-    const PATH = require('path');
     const SPAWN = require('child_process').spawn;
     console.log(`trying to open Text Editor by command: ${config.editor} ${config.tempPath}`);
 
