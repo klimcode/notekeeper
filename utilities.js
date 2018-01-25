@@ -1,4 +1,4 @@
-function removeClonesFrom(arr) {
+function removeDuplicates(arr) {
     for (var i = arr.length; i--;) {
         for (var j = i; j--;) {
             if (arr[j] === arr[i]) {
@@ -9,8 +9,19 @@ function removeClonesFrom(arr) {
     }
     return arr;
 }
+function getObjFromArr(arr) {
+    let obj = {};
+    arr.forEach((item) => obj[item.type] = item.content);
+    return obj;
+}
+function updateArrByObj(arr, obj) {
+    arr.forEach((item) => item.content = obj[item.type]);
+    return arr;
+}
 
 
 module.exports = {
-    'removeClonesFrom': removeClonesFrom,
+    'removeDuplicatesFrom': removeDuplicates,
+    'getObjFromArr': getObjFromArr,
+    'updateArrByObj': updateArrByObj,
 }

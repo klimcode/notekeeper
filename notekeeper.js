@@ -5,7 +5,7 @@ const UTIL = require('./utilities');
 
 const configFilename = 'config.json';
 const interfaceFilename = 'interface.txt';
-const mainFLOW = new Flow();
+const mainFLOW = new Flow(true);
 global.storage = {};
 
 
@@ -14,10 +14,12 @@ mainFLOW.steps = {
     'start': getConfig,
     'config is OK': getDatabase,
     'database is OK': parseTagsFromBase,
-    'tags are parsed': createInterface,
+    'tags are parsed from database': createInterface,
     'interface created': updateInterface,
-    'interface is recorded in Notefile': [ watchInterfaceChanges, openTextEditor ],
-    'note was changed': closeApp,
+    'interface is recorded in Notefile': [ openTextEditor, watchInterfaceChanges ],
+    'interfase must be restored': updateInterface,
+    'note has been changed': executeCommands,
+    'new note saved to database': updateInterface,
 
     'problem with interface': writeMessageToInterface,
     'problem with interface solved': removeMessageFromInterface,
@@ -30,7 +32,7 @@ mainFLOW.to('start');
 
 function getConfig() {
     const pathToConfig = PATH.resolve(__dirname, configFilename);
-    console.log(`trying to read: ${pathToConfig}`);
+    console.log(`trying to read config: ${pathToConfig}`);
     FILE.getConfig(
         pathToConfig,
         (content) => { storage.config = content; mainFLOW.to('config is OK', content) }
@@ -46,17 +48,17 @@ function getDatabase() {
 function parseTagsFromBase(dbContent) {
     let tags = dbContent.match(/\b___\w+/g);
     if (tags) {
-        tags = UTIL.removeClonesFrom(tags);
+        tags = UTIL.removeDuplicatesFrom(tags);
     } else {
         tags = [];
     }
     tags = tags.sort();
 
-    mainFLOW.to('tags are parsed', tags);
+    mainFLOW.to('tags are parsed from database', tags);
 }
 function createInterface(tagsFromBase) {
     const pathToInterface = PATH.resolve(__dirname, interfaceFilename);
-    console.log(`trying to read text interface from: ${pathToInterface}`);
+    console.log(`trying to read text interface from file: ${pathToInterface}`);
 
 
     FILE.readOrMake(
@@ -67,6 +69,9 @@ function createInterface(tagsFromBase) {
 
 
     function makeDefaultInterface() {
+        console.log(`Default Interface will be created`);
+
+
         let interface = `<note><>`;
         interface +=    `\n================================== tags ======================================\n`;
         interface +=    `<tags><>`;
@@ -126,6 +131,10 @@ function updateInterface(interface) {
         interfaceText += interface[i].title + interface[i].content;
     }
 
+    if (storage.isWatchingStarted) { // Interface updates must not be detected
+        storage.dontReadFile = true;
+    }
+
     FILE.write(
         pathToTempFile,
         interfaceText,
@@ -134,14 +143,13 @@ function updateInterface(interface) {
 }
 function watchInterfaceChanges(interface) {
     const noteFile = storage.config.tempPath;
+    console.log('watching on Note File...');
 
 
     if (!storage.isWatchingStarted) { // Make an event for the first time only.
         storage.isWatchingStarted = true;
 
         FILE.watch(noteFile, readNoteFile);
-
-        console.log('watching on Note File...')
     }
 
 
@@ -156,10 +164,10 @@ function watchInterfaceChanges(interface) {
     function parseNoteContent(content) {
         let rawText = content;
         const brokenInterfaceMsg =
-            '\n\n!!! Interface is broken !!!!\n\n' +
+            '\n\n! Interface is broken !\n\n' +
             'It will be completely restored on next saving.\n' +
             'Please, copy your Note (Ctrl+C).\n' +
-            'Then press Ctrl+S and paste it to the restored interface\n\n' +
+            'Then press Ctrl+S and paste it to the restored interface.\n\n' +
             'It also may be restored manually...';
 
 
@@ -170,9 +178,15 @@ function watchInterfaceChanges(interface) {
 
 
             tempArr = rawText.split(delimeter);
-            if (!tempArr[1]) {
-                storage.brokenInterface = true;
-                return mainFLOW.to('problem with interface', brokenInterfaceMsg);
+
+            if (!tempArr[1]) { // Check for the Interface integrity
+                if (storage.brokenInterface) {
+                    storage.brokenInterface = false;
+                    return mainFLOW.to('interfase must be restored', interface);
+                } else {
+                    storage.brokenInterface = true;
+                    return mainFLOW.to('problem with interface', brokenInterfaceMsg);
+                }
             }
 
 
@@ -185,14 +199,14 @@ function watchInterfaceChanges(interface) {
             mainFLOW.to('problem with interface solved', content);
         }
 
-        console.log(interface);
-        // mainFLOW.to('note was changed', interface);
+
+        mainFLOW.to('note has been changed', interface);
     }
 }
 function writeMessageToInterface(message) {
     storage.interfaceMsg = message;
     storage.dontReadFile = true;
-    console.log(message);
+    console.log('\x1b[31m%s\x1b[0m', message);
 
     FILE.append(
         storage.config.tempPath,
@@ -213,23 +227,79 @@ function removeMessageFromInterface(content) {
         textWithoutMsg
     );
 }
-
-
 function openTextEditor() {
+    if (storage.isEditorOpened) return;
+
+
     const config = storage.config;
     const PATH = require('path');
     const SPAWN = require('child_process').spawn;
-
-
     console.log(`trying to open Text Editor by command: ${config.editor} ${config.tempPath}`);
 
 
     let child = SPAWN(config.editor, [config.tempPath]);
     let resp = '';
 
-    child.stdout.on('data', (buffer) => { resp += buffer.toString() });
-    child.stdout.on('end', () => {});
+
+    storage.isEditorOpened = true;
 }
+
+
+
+
+function executeCommands(interface) {
+    const controls = UTIL.getObjFromArr(interface);
+    const note = controls.note;
+    const tagsNew = controls.tags;
+    const command = controls.commands;
+    console.log('trying to execute command: '+ command);
+
+
+    const commandsList = {
+        '': doNothing,
+        'save': saveNote,
+        'clear': clearInterface,
+        'exit': exit,
+    };
+    commandsList[command]();
+
+
+    function doNothing() {
+
+        console.log('nothing :)\n');
+    }
+    function saveNote() {
+        if (!note) return console.log('Empty Note will not be placed to database');
+
+
+        let tagsArr = (controls.tags_used +', '+ tagsNew).match(/\w+/g);   // New tags added to list of used tags.
+        controls.tags_used = UTIL.removeDuplicatesFrom(tagsArr).join(', ');    // Dupes are deleted.
+        interface = UTIL.updateArrByObj(interface, controls);
+
+
+        let textForDatabase = '\n'+
+            tagsNew +'\n\n'+
+            note + '\n==============================================================================\n';
+
+
+        FILE.append(
+            storage.config.dbPath,
+            textForDatabase,
+            () => mainFLOW.to('new note saved to database', interface)
+        );
+    }
+    function clearInterface() {
+        controls.note = '';
+        interface = UTIL.updateArrByObj(interface, controls);
+
+        mainFLOW.to('interfase must be restored', interface);
+    }
+    function exit() {
+        mainFLOW.to('finish', 'Tot ziens!\n');
+    }
+}
+
+
 
 
 function closeApp(param) {
