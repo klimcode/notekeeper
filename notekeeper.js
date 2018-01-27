@@ -42,7 +42,7 @@ function getConfig() {
     const CLIQuestions = [
         { prop: 'pathToBase', question: 'New config-file will be created. Please, answer on 3 questions. \nFull path to database file (with filename):', def: defPathToBase },
         { prop: 'pathToNotefile', question: 'Path to temp file:', def: defPathToNote },
-        { prop: 'editor', question: 'Command to open your text editor:', def: 'subl' },
+        { prop: 'editor', question: 'Shell command to open your text editor:', def: 'subl' },
     ];
 
 
@@ -228,12 +228,17 @@ function openTextEditor() {
 
 
     const config = storage.config;
-    const SPAWN = require('child_process').spawn;
-    console.log(`trying to open Text Editor by command: ${config.editor} ${config.pathToNotefile}`);
+	const shellCommand = `${config.editor} ${config.pathToNotefile}`;
+    console.log(`trying to open Text Editor by command: ${shellCommand}`);
 
 
-    let child = SPAWN(config.editor, [config.pathToNotefile]);
-    let resp = '';
+	// An example of working shell command for Windows CMD
+	// shellCommand = 'start "" "c:\\Program Files\\Sublime Text 3\\sublime_text.exe"';
+    const exec = require('child_process').exec;
+    exec(shellCommand, callback);
+    function callback(error, stdout, stderr) {
+        // console.log(error, stdout, stderr)
+    }
 
 
     storage.isEditorOpened = true;
