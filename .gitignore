@@ -4,6 +4,10 @@ interface.txt
 base.txt
 note.txt
 
+# Sublime project files
+*.sublime-project
+*.sublime-workspace
+
 # Logs
 logs
 *.log
