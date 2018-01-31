@@ -27,9 +27,9 @@ The questions have default values: `~/base.txt`, `~note.txt`, `subl` accordingly
 Notekeeper was tested with Sublime text only.  
 It should work with any text editor which can be executed with shell command `editor filepath`.
 
-----
 
 .
+
 
 ## How it works
 
@@ -47,17 +47,17 @@ save
 ========================== tags used previously ==============================
 ___sometag,
 ```
-The first field is intended for your new Note.  
-
-`================================== tags ======================================` is a delimeter, important part of the interface. 
-It should not be changed in the Notefile. 
-Otherwise, the Interface can not be parsed by Notekeeper and a warning appears.  
-
-Line under "tags" delimeter is a field to enter your Tags for the current Note.  
-
-The next field accepts Commands listed below...  
-
-The Tags parsed from Database will be shown it the last field. Their goal is to make Tags reusing more handy with autocomplete function (depends on a Text editor).
+> The first field is intended for your new Note.  
+>
+> `================================== tags ======================================` is a delimeter important for the interface. 
+> It should not be changed in the Notefile. 
+> Otherwise, the Interface can not be parsed by Notekeeper and a warning appears.  
+> 
+> Line under "tags" delimeter is a field to enter your Tags for the current Note.  
+> 
+> The next field accepts Commands listed below...  
+> 
+> The Tags parsed from Database will be shown it the last field. Their goal is to make Tags reusing more handy with autocomplete function (depends on a Text editor).
 
 3. Write or paste your note to the first line of the Notefile. Your note may contain unlimited count of lines and any symbols.
 
