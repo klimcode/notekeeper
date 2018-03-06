@@ -61,6 +61,7 @@ function getDatabase() {
     );
 }
 function parseTagsFromBase(dbContent) {
+
     let tags = dbContent.match(/\b___\w+/g);
     if (tags) {
         tags = UTIL.removeDuplicatesFrom(tags).sort();
@@ -69,6 +70,91 @@ function parseTagsFromBase(dbContent) {
     }
 
     mainFLOW.result('tags are parsed from database', tags);
+
+
+
+    /*
+    function parseTabulation(argument) {
+        const arr = [];
+        let spaces = 0;
+        let line = '';
+        for (let i = 0; i < dbContent.length; i++) {
+            let char = dbContent[i];
+
+            if (char === '\n') {        // End of a line
+                arr.push({'spaces': spaces, 'line': line});
+
+                line = '';
+                spaces = 0;
+            } else {
+                if (!line) {
+                    if (char === ' ') {     // somewhere inside a Tabulation
+                        spaces++;
+                    } else {
+                        line += char;       // Start of a line
+                    }
+                } else {                    // somewhere inside a line
+                    line += char;
+                }
+            }
+        }
+        arr.push({'spaces': spaces, 'line': line});     // The last line
+        console.log(arr);
+    }
+    */
+
+
+
+
+
+
+    const pathToBaseTemplate = PATH.join( HOMEDIR, 'notekeeper_template_base.txt' );
+
+    FILE.read(
+        pathToBaseTemplate,
+        template => {
+            storage.baseTemplate = template;
+            parseBase (dbContent, template);
+        }
+    );
+
+
+    function parseBase (baseContent, template) {
+        let parser = createParser (template);
+
+        storage.baseParsed = UTIL.getRegexCaptures (
+            baseContent,
+            parser,
+            (matches, result) => {
+                let props = parser.props;
+                let record = Object.assign(...props.map( (prop, i) => ({[prop]: matches[i]}) ) );
+
+                result.push(record);
+            }
+        );
+        console.log(parser, storage.baseParsed)
+    }
+
+    function createParser (template) { // TODO: move it to UTILS
+        let parser = createRegex (template);
+
+        parser.props = UTIL.getRegexCaptures(
+            template,
+            /<(\w+)>/g,
+            (matches, result) => result.push(matches[0])
+        );
+        storage.baseTemplateProps = parser.props;
+
+        return parser;
+
+        function createRegex (template){
+            let mask = template
+                .replace(/<text>/, '([\\s\\S]*?)')
+                .replace(/<\w+>/g, '(.*)');
+
+            return new RegExp (mask, 'g');
+        }
+    }
 }
 function createInterface(tagsFromBase) {
     const tagsFromBaseString = tagsFromBase.join(', ');
@@ -217,7 +303,6 @@ function watchInterfaceChanges(interface) {
             mainFLOW.result('problem with interface solved', content);
         }
 
-
         mainFLOW.result('note has been changed', interface);
     }
 }
@@ -244,10 +329,8 @@ function openTextEditor() {
     storage.isEditorOpened = true;
 }
 function executeCommands(interface) {
-    const controls = UTIL.getObjFromArr(interface);
-    const note = controls.note;
-    const tagsNew = controls.tags;
-    const command = controls.commands;
+    const newNote = UTIL.getObjFromArr(interface);
+    const command = newNote.command;
     console.log('trying to execute command: '+ command);
 
 
@@ -256,6 +339,8 @@ function executeCommands(interface) {
         'save': saveNote,
         'clear': clearInterface,
         'exit': exit,
+
+        'test': saveNoteNew,
     };
     commandsList[command]();
 
@@ -265,17 +350,17 @@ function executeCommands(interface) {
         console.log('nothing :)\n');
     }
     function saveNote() {
-        if (!note) return console.log('Empty Note will not be placed to database');
+        if (!newNote.note) return console.log('Empty Note will not be placed to database');
 
 
-        let tagsArr = (controls.tags_used +', '+ tagsNew).match(/\w+/g);   // New tags added to list of used tags.
-        controls.tags_used = UTIL.removeDuplicatesFrom(tagsArr).join(', ');    // Dupes are deleted.
-        interface = UTIL.updateArrByObj(interface, controls);
+        let tagsArr = (newNote.tags_used +', '+ tagsNew).match(/\w+/g);   // New tags added to list of used tags.
+        newNote.tags_used = UTIL.removeDuplicatesFrom(tagsArr).join(', ');    // Dupes are deleted.
+        interface = UTIL.updateArrByObj(interface, newNote);
 
 
         let textForDatabase = '\n'+
             tagsNew +'\n\n'+
-            note + '\n==============================================================================\n';
+            newNote.note + '\n==============================================================================\n';
 
 
         FILE.append(
@@ -285,13 +370,62 @@ function executeCommands(interface) {
         );
     }
     function clearInterface() {
-        controls.note = '';
-        interface = UTIL.updateArrByObj(interface, controls);
+        newNote.note = '';
+        interface = UTIL.updateArrByObj(interface, newNote);
 
         mainFLOW.result('interfase must be restored', interface);
     }
     function exit() {
         mainFLOW.result('finish', 'Tot ziens!\n');
+    }
+
+
+
+
+    function saveNoteNew() {
+        // 1) check the Base: is the new Note name already existed
+        // 2) if NOT exists --> append new Record to the Base
+        // 3) else --> concatenate old and new Records --> change mode to Rewriting
+        // 4) show the resulting Note --> ask for rewriting permission
+
+
+        const base = storage.baseParsed;
+        const nameDuplicated = base.filter (r => r.name.toLowerCase() === newNote.name.toLowerCase() )[0];
+        const newNoteTags = newNote.tags.split (',').map (s => s.trim() );
+
+
+        if (!nameDuplicated) {
+            const props = storage.baseTemplateProps;
+            const record = Object.assign(...props.map( prop => ({[prop]: newNote[prop]}) ) );
+            const template = storage.baseTemplate;
+            const recordString = stringifyNote (newNote, template, props);
+
+
+            storage.baseParsed.push(record);
+            console.log(storage.baseParsed);
+        } else {
+            // let record = {}
+            // Object.assign(record, storage.newBase[nameDuplicated]);
+
+            // newNote.note && (record.t += '\n' + newNote.note);
+            // newNoteParents[0] && (record.p = [...record.p, ...newNoteParents]);
+
+            // storage.modeRewriting = true;
+        }
+
+
+
+
+
+        function stringifyNote (note, template, templateProps) { // TODO: move it to UTILS
+
+            function replaceTemplatePropsByValues (acc, val) {
+                let regex = new RegExp ('<'+ val +'>');
+                return acc.replace (regex, note[val]);
+            }
+
+            return templateProps.reduce (replaceTemplatePropsByValues, template);
+        }
     }
 }
 
