@@ -32,11 +32,13 @@ module.exports = {
 
         return result;
     },
-    prettifyTagsList (string) { // "a, b  ,, c,d," --> [a, b, c, d]
-        return string
+    prettifyTagsList (input) { // "a, b ,,b   ,,  c,d,d" ==> [a, b, c, d]
+        let tags = input
             .split (',')
             .map (s => s.trim())
             .filter (s => s != '');
+
+        return this.removeDuplicatesFrom (tags);
     },
 
 
@@ -44,44 +46,54 @@ module.exports = {
     //      THESE FUNCTIONS DEPEND ON A CURRENT NOTEKEEPER REALISATION
     //===================================================================================================
 
-    getObjFromArr (arr) { 
-        let obj = {};
-        arr.forEach (item => obj[item.type] = item.content);
-        return obj;
-    },
-
-    updateArrByObj (arr, obj) {
-
-        return arr.map (item => {item.content = obj[item.type]; return item });
-    },
-
-    createParser (template) { // makes a Regexp with a property contains a list of Template fields. Used for Base parsing.
+    createParser (template) { // makes a Regexp with a property contains a list of Template fields (Captures)
         let parser = createRegex (template);
 
-        parser.props = this.getRegexCaptures (
+        parser.template = template;
+        parser.captures = this.getRegexCaptures (
             template,
-            /<(\w+)>/g,
-            (matches, result) => result.push(matches[0])
+            /<(\w+)>.*<>/g,
+            (matches, result) => result.push (matches[0])
         );
-
         return parser;
 
         function createRegex (template) {
             let mask = template
-                .replace(/<text>/, '([\\s\\S]*?)')  // a multi-line field
-                .replace(/<\w+>/g, '(.*)');         // a single-line field
+                .replace (/<text>.*<>/, '([\\s\\S]*?)')  // a multi-line field
+                .replace (/<\w+>.*<>/g, '(.*)')          // a single-line field
 
             return new RegExp (mask, 'g');
         }
     },
+    parse (data, parser) { // return a Record object if count of Records == 1, else an array of them
+        let result = this.getRegexCaptures (
+            data,
+            parser,
+            (matches, result) => {
+                let record = Object.assign (...parser.captures.map ( (prop, i) => {  // makes Obj from 2 Arrays
+                    let match = matches[i].replace(/<\w+>(.*)<>/g, '$1')
+                    return { [prop]: match };
+                }) );
 
-    stringifyNote (note, template) { // creates a string from a Template with replaced Props by values from Note object
+                result.push (record);
+            });
 
-        return template.props.reduce (replaceTemplatePropsByValues, template.text);
+        return (result.length == 1)? result[0]: result;
+    },
+    getUsedTags (base) {
+        let tagsArr = base.reduce ((acc, record) => (acc.concat (record.tags.split(', '))), []);
+        return this.removeDuplicatesFrom (tagsArr);
+        
+        // return tagsString;
+    },
 
-        function replaceTemplatePropsByValues (acc, val) {
-            let regex = new RegExp ('<'+ val +'>');
-            let data = note[val];
+    stringifyInterface (note, parser) { // creates a string from a Template with replaced Props by values from Note object
+
+        return parser.captures.reduce (insertValuesToTemplate, parser.template);
+
+        function insertValuesToTemplate (acc, prop) {
+            let regex = new RegExp ('<'+ prop +'>.*<>');
+            let data = note[prop];
             if (data instanceof Array) data = data.join(', ');
 
             return acc.replace (regex, data);
