@@ -7,12 +7,14 @@
     const UTIL = require('./utilities');
     const HOMEDIR = require('os').homedir();
 
-    const FLOW = new Flow();
     global.G = {
         isStartup: true,
+        isLogging: true,
+        isFlowLogging: false,
         base: {},
         view: {},
     };
+    const FLOW = new Flow({isLogging: G.isFlowLogging});
 
 
 FLOW.steps = {
@@ -27,13 +29,12 @@ FLOW.steps = {
 
     // change detection and commands execution
     'interface is changed': executeCommands,
-    'interface must be restored': renderInterface,
-    'note is saved to database': renderInterface,
-    'update existing record?': renderInterface,
+    'interface is refreshed': renderInterface,
+    'baseFile is updated': nope,
+    'interface is restored': renderInterface,
 
     // messaging
-    'problem with interface': writeMessageToInterface,
-    'problem with interface solved': removeMessageFromInterface,
+    'interface is broken': showErrorMessage,
     'fatal error': closeApp,
     'finish': closeApp,
 };
@@ -52,7 +53,7 @@ function getConfig() { // TODO: separate CLI and Config file creation
     ];
 
 
-    console.log(`trying to read config: ${pathToConfig}`);
+    log(`trying to read config: ${pathToConfig}`);
     FILE.getConfig(
         pathToConfig,
         CLIQuestions,
@@ -71,7 +72,7 @@ function getConfig() { // TODO: separate CLI and Config file creation
 function getBase() {
     const newBaseContent = '';
 
-    console.log (`trying to read database: ${G.config.pathToBase}`);
+    log (`trying to read database: ${G.config.pathToBase}`);
     FILE.readOrMake(
         G.config.pathToBase,
         (content) => FLOW.done ('database is OK', content),
@@ -81,23 +82,20 @@ function getBase() {
 
 
     function newBaseCreated (path, content) {
-        console.log (`created database file: ${path}`);
+        log (`created database file: ${path}`);
 
         FLOW.done ('database is OK', content);
     }
 }
 function getBaseTemplate() {
     let defTemplateText =
-    '<text><>' +
-    '\n================================== tags ======================================\n' +
-    '<tags><>' +
-    '\n================================ commands ====================================\n' +
-    '<commands>save<>' +
-    '\n========================== tags used previously ==============================\n' +
-    '<tags_used>___any_tag<>';
+    '<name><>\n' +
+    '<tags><>\n' +
+    '<text><m>\n' +
+    '==============================================================================\n';
 
 
-    console.log (`trying to read Template for Database parsing: ${G.config.pathToBaseTemplate}`);
+    log (`trying to read Template for Database parsing: ${G.config.pathToBaseTemplate}`);
     FILE.readOrMake (
         G.config.pathToBaseTemplate,
         processTemplate,
@@ -108,7 +106,7 @@ function getBaseTemplate() {
 
     function defTemplateFileCreated (path, content) {
 
-        console.log(`created file for Base Template: ${path}. You may edit it manually.`);
+        log(`created file for Base Template: ${path}. You may edit it manually.`);
         processTemplate (content);
     }
     function processTemplate (template) {
@@ -131,16 +129,16 @@ function parseBase(base) {
 }
 function getInterfaceTemplate() {
     let defTemplateText =
-    '<text><>' +
+    '<text><m>' +
     '\n================================== tags ======================================\n' +
     '<tags><>' +
     '\n================================ commands ====================================\n' +
-    '<commands>save<>' +
+    '<commands>add<m>' +
     '\n========================== tags used previously ==============================\n' +
     '<tags_used>___any_tag<>';
 
 
-    console.log (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
+    log (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
     FILE.readOrMake (
         G.config.pathToInterfaceTemplate,
         processTemplate,
@@ -151,7 +149,7 @@ function getInterfaceTemplate() {
 
     function defTemplateFileCreated (path, content) {
 
-        console.log(`created file for Interface Template: ${path}. You may edit it manually.`);
+        log(`created file for Interface Template: ${path}. You may edit it manually.`);
         processTemplate (content);
     }
     function processTemplate (template) {
@@ -167,7 +165,7 @@ function openTextEditor() {
 
     const config = G.config;
     const shellCommand = `${config.editor} ${config.pathToInterface}`;
-    console.log(`trying to open Text Editor by command: ${shellCommand}`);
+    log(`trying to open Text Editor by command: ${shellCommand}`);
 
 
     // An example of working shell command for Windows CMD
@@ -183,7 +181,7 @@ function openTextEditor() {
 }
 function detectInterfaceChanges() {
     const interfaceFile = G.config.pathToInterface;
-    console.log('watching on Interface File...');
+    log('detecting changes of Interface File...');
 
 
     G.isStartup = false; // Notekeeper is started
@@ -203,6 +201,9 @@ function detectInterfaceChanges() {
         function parseInterface (content) {
             let interface = UTIL.parse (content, G.view.parser);
 
+
+            if (!interface) return FLOW.done ('interface is broken');
+
             interface.tags = UTIL.prettifyTagsList (interface.tags);
             G.view.data = interface;
 
@@ -210,7 +211,6 @@ function detectInterfaceChanges() {
         }
     }
 }
-
 
 
 // INTERFACE RENDERING
@@ -229,6 +229,7 @@ function renderInterface() {
 
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
+    G.view.needRestoration = false; // Interface is restored
     FILE.write(
         pathToInterface,
         interfaceText,
@@ -237,184 +238,156 @@ function renderInterface() {
 }
 
 
-
-
-
-
-
-
+// ACTIONS
+function nope() {/*nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
-    const command = interface.command;
-    console.log ('trying to execute command: '+ command);
+    let command = interface.command.split ('\n')[0];
+    let msg = '';
+    log ('trying to execute command: '+ command);
 
 
     const commandsList = {
-        '': doNothing,
-        'add': addNewRecord,
-        'update': updateExistingNote,
-        'clear': clearInterface,
-        'exit': exit,
+        '': command_empty,
+        'add': command_add,
+        'edit': command_edit,
+        'del': command_delete,
+        'clear': command_clear,
+        'exit': command_exit,
     };
     commandsList[command]();
+    interface.command = command + (msg? '\n\n'+ msg : '');
+    FLOW.done ('interface is refreshed', interface);
 
 
-    function doNothing() {
+    function command_empty() {
 
-        console.log ('nothing :)\n');
+        log ('nothing :)\n');
     }
-    function clearInterface() {
-        newNote.note = '';
-        interface = UTIL.updateArrByObj(interface, newNote);
-
-        FLOW.done('interface must be restored', interface);
+    function command_clear() {
+        interface.text = '';
+        interface.name = '';
+        interface.tags = '';
     }
-    function exit() {
+    function command_exit() {
 
-        FLOW.done('finish', 'Tot ziens!\n');
+        FLOW.done ('finish', 'Tot ziens!\n');
     }
 
+    function command_add() {
+        const duplicateIndex = searchDuplicate ();
 
+        if (duplicateIndex == -1) { // There are no Records in the Base with the same name as a New Note has
 
-
-    function addNewRecord() {
-        const nameDuplicatedIndex = checkNamesForDuplicate (base, interface.name);
-
-
-console.log ('***************************** executeCommands \n\n', G.view.data);
-// console.trace('_________')
-/*▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐
-
-        if (nameDuplicatedIndex == -1) { // There are no duplicates in the Base
-
-            G.baseParsed.push ( record (newNote, template) );
+            if (!interface.text) {
+                msg = `THE TEXT IS EMPTY. IT WILL NOT BE ADDED TO BASE`;
+            } else {
+                if (!interface.name) {
+                    msg = `NEW UNNAMED RECORD WAS PUSHED TO BASE`;
+                } else {
+                    msg = `NEW RECORD NAMED "${interface.name}" WAS PUSHED TO BASE`;
+                }
+                pushNewRecordToBase ();
+                updateBaseFile ();
+            }
         } else { // The base has already had a record with the same name as a New Note has
-
-            newNote.command = 'update';
-            mixWithExistingRecord (newNote, base[nameDuplicatedIndex]);
+            msg = `A RECORD NAMED "${interface.name}" ALREADY EXISTS. EDIT IT?`;
+            command = 'edit';
+            concatRecords (duplicateIndex); // Shows a Record combined from New Note and existing one. Does not change the Base.
         }
-
-        updateInterface();
-/**/
     }
+    function command_edit() {
+        const duplicateIndex = searchDuplicate();
 
-
-    function updateExistingNote() {
-        const nameDuplicatedIndex = checkNamesForDuplicate();
-
-        if (nameDuplicatedIndex == -1) { // There are no duplicates in the Base
-
-            newNote.command = 'add';
+        if (duplicateIndex == -1) { // There are no duplicates in the Base
+            msg = `ADD A NEW RECORD NAMED "${interface.name}" TO THE BASE?`;
+            command = 'add';
         } else { // The base has already had a record with the same name as a New Note has
-
-            G.baseParsed.splice (nameDuplicatedIndex, 1);     // delete an old record
-            G.baseParsed.push ( record (newNote, template) ); // push a new record
+            msg = `A RECORD NAMED "${interface.name}" WAS SUCCESSFULLY EDITED`;
+            deleteBaseRecord (duplicateIndex);
+            pushNewRecordToBase ();
+            updateBaseFile ();
         }
+    }
+    function command_delete() {
+        const duplicateIndex = searchDuplicate();
 
-        updateInterface();
+        if (duplicateIndex == -1) { // There are no duplicates in the Base
+            msg = `ADD A NEW RECORD NAMED "${interface.name}" TO THE BASE?`;
+            command = 'add';
+        } else { // The base has already had a record with the same name as a New Note has
+            msg = `A RECORD NAMED "${interface.name}" IS DELETED`;
+            deleteBaseRecord (duplicateIndex);
+            updateBaseFile ();
+        }
     }
 
     // Utility functions
-        function checkNamesForDuplicate (base, newName) {
+        function searchDuplicate () {
+            let newName = interface.name;
             return newName ?
                 base.findIndex (record => record.name.toLowerCase() === newName.toLowerCase() ) :
                 -1;     // empty name equals to uniq name
         }
-        function record (note, template) {
+        function pushNewRecordToBase () {
 
-            return record = Object.assign(...template.props.map( prop => ({[prop]: note[prop]}) ) );
+            G.base.data.push ( UTIL.convertToBaseRecord (interface, baseParser) );
         }
-        function mixWithExistingRecord (note, existedRecord) { // Mutates Note
+        function concatRecords (index) { // Mutates New Note in the Interface
+            let baseRecord = base[index];
 
-            note.tags = UTIL.concatTagsUniq (existedRecord.tags, note.tags);
-            note.text = UTIL.concatTextUniq (existedRecord.text, note.text);
+            interface.tags = UTIL.concatUniqTags (baseRecord.tags, interface.tags);
+            interface.text = UTIL.concatUniqText (baseRecord.text, interface.text);
         }
-        function updateInterface (){
-            newNote.tags_used = UTIL.concatTagsUniq (newNote.tags_used, newNote.tags).join (', ');
-            interface = UTIL.updateArrByObj(interface, newNote);
-            FLOW.done('note is saved to database', interface);
+        function deleteBaseRecord (index) {
 
-            console.log( UTIL.stringifyBase (base, template) );
-            // FILE.append(
-            //     G.config.pathToBase,
-            //     UTIL.stringifyNote (newNote, template),
-            //     () => FLOW.done(FLOWresult, interface)
-            // );
+            base.splice (index, 1);
+        }
+
+        function updateBaseFile () {
+            // console.log ( UTIL.stringifyBase (base, baseParser) );
+            FILE.write (
+                G.config.pathToBase,
+                UTIL.stringifyBase (base, baseParser),
+                () => FLOW.done ('baseFile is updated')
+            );
         }
 }
+function showErrorMessage(message) {
+    const restore = G.view.needRestoration;
+    let mesBroken = 
+        '\n\n                    INTERFACE IS BROKEN !\n'+
+        'PLEASE, FIX IT MANUALLY OR IT WILL BE RESTORED WITH POSSIBLE DATA LOOSING';
+    if (G.view.needRestoration) mesBroken = '';
+    let msg = message || mesBroken;
 
 
-function writeMessageToInterface(message) {
-    G.viewMsg = message;
+    G.view.needRestoration = true;
     G.view.dontRead = true;
-    console.log('\x1b[31m%s\x1b[0m', message);
+    err (msg);
 
-    FILE.append(
+
+    FILE.append (
         G.config.pathToInterface,
-        message
-    );
-}
-function removeMessageFromInterface(content) {
-    const message = G.viewMsg;
-    G.viewMsg = '';
-    G.view.dontRead = true;
-
-    const textWithMsg = content || '';
-    const textWithoutMsg = textWithMsg.split(message)[0];
-
-
-    FILE.write(
-        G.config.pathToInterface,
-        textWithoutMsg
+        msg,
+        () => restore && FLOW.done ('interface is restored')
     );
 }
 function closeApp(param) {
-    console.log(param);
-    process.exit();
+    log (param);
+    process.exit ();
 }
 
 
-
-
-
-/*
-function parseInterface (content) {
-    let rawText = content;
-    const brokenInterfaceMsg =
-        '\n\n! Interface is broken !\n\n' +
-        'It will be completely restored on next saving.\n' +
-        'Please, copy your Note (Ctrl+C).\n' +
-        'Then press Ctrl+S and paste it to the restored interface.\n\n' +
-        'It also may be restored manually...';
-
-
-    for (let i = 0; i < interface.length-1; i++) {  // Parsing
-        let region = interface[i];
-        let delimeter = interface[i+1].delimeter;
-        let tempArr = rawText.split(delimeter);
-
-        if (!tempArr[1]) { // Check for the Interface integrity
-            if (G.brokenInterface) {
-                G.brokenInterface = false;
-                return FLOW.done('interface must be restored', interface);
-            } else {
-                G.brokenInterface = true;
-                return FLOW.done('problem with interface', brokenInterfaceMsg);
-            }
-        }
-
-
-        region.content = tempArr[0];
-        rawText = tempArr.slice(1,tempArr.length).join(delimeter); // rest
+// CONSOLE LOGGING
+    function log (msg) {
+        G.isLogging && console.log ('\x1b[2m%s\x1b[0m', msg);
+    }
+    function err(msg) {
+        console.log ('\x1b[31m%s\x1b[0m', msg);
     }
 
-    if (G.brokenInterface) {  // Removing message about broken interface
-        G.brokenInterface = false;
-        FLOW.done('problem with interface solved', content);
-    }
-}
-*/
 
 /*
 function parseTabulation(argument) {

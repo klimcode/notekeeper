@@ -1,6 +1,6 @@
 {
   "name": "notekeeper",
-  "version": "2.9.0",
+  "version": "3.0.0",
   "description": "A simple cross-platform utility for making notes",
   "main": "notekeeper.js",
   "bin": {

@@ -40,6 +40,7 @@ Each tag must have 3 underscores in the begining like this: `___sample_tag`. An 
 The default interface looks like this:
 ```
 
+//CHANGED
 ================================== tags ======================================
 
 ================================ commands ====================================
