@@ -5,21 +5,23 @@
     const Flow = require('flow-code-description');
     const FILE = require('fs-handy-wraps');
     const UTIL = require('./utilities');
-    const HOMEDIR = require('os').homedir();
 
     global.G = {
+        firstStart: false,
+        homedir: PATH.join (require('os').homedir(), 'notekeeper'),
         isStartup: true,
         isLogging: true,
-        isFlowLogging: false,
+        flowSettings: {isLogging: true},
         base: {},
         view: {},
     };
-    const FLOW = new Flow({isLogging: G.isFlowLogging});
+    const FLOW = new Flow(G.flowSettings);
 
 
 FLOW.steps = {
     // startup steps
-    'start': getConfig,
+    'start': makeHomedir,
+    'home directory is OK': getConfig,
     'config is OK': [ getBase, getBaseTemplate, getInterfaceTemplate ],
     'database is OK': parseBase,
     'template for database is OK': parseBase,
@@ -42,60 +44,71 @@ FLOW.done('start');
 
 
 // STARTUP FUNCTIONS
-function getConfig() { // TODO: separate CLI and Config file creation
-    const pathToConfig = PATH.join( HOMEDIR, 'notekeeper_config.json' );
-    const defPathToBase = PATH.join( HOMEDIR, 'notekeeper_base.txt' );
-    const defPathToInterface = PATH.join( HOMEDIR, 'notekeeper_note.txt' );
+function makeHomedir() {
+    const dir = G.homedir;
+
+    FILE.makeDir (
+        dir,
+        () => FLOW.done ('home directory is OK', dir)
+    );
+}
+function getConfig(dir) { // TODO: separate CLI and Config file creation
+    const pathToConfig = PATH.join( dir, 'config.json' );
+    const defaultValues = {
+        pathToBase:             PATH.join( dir, 'base.txt' ),
+        pathToBaseTemplate:     PATH.join( dir, 'template_base.txt' ),
+        pathToInterface:        PATH.join( dir, 'new_note.txt' ),
+        pathToInterfaceTemplate: PATH.join( dir, 'template_interface.txt' ),
+        editor: 'subl',
+    };
     const CLIQuestions = [
-        { prop: 'pathToBase', question: 'New config-file will be created. Please, answer on 3 questions. \nFull path to database file (with filename):', def: defPathToBase },
-        { prop: 'pathToInterface', question: 'Path to new Note file:', def: defPathToInterface },
-        { prop: 'editor', question: 'Shell command to open your text editor:', def: 'subl' },
+        { prop: 'pathToBase', question: 'New config-file will be created. Please, answer on 3 questions. \nFull path to database file (with filename):' },
+        { prop: 'pathToInterface', question: 'Path to new Note file:' },
+        { prop: 'editor', question: 'Shell command to open your text editor:' },
     ];
 
 
-    log(`trying to read config: ${pathToConfig}`);
-    FILE.getConfig(
+    LOG (`trying to read config: ${pathToConfig}`);
+    FILE.getConfig (
         pathToConfig,
-        CLIQuestions,
-        postprocessConfig
+        postprocessConfig,
+        defaultValues,
+        CLIQuestions
     );
 
     function postprocessConfig (config) {
-        config.pathToBaseTemplate = PATH.join( HOMEDIR, 'notekeeper_template_base.txt' );
-        config.pathToInterfaceTemplate = PATH.join( HOMEDIR, 'notekeeper_template_interface.txt' );
-
         G.config = config;
 
         FLOW.done('config is OK');
     }
 }
 function getBase() {
-    const newBaseContent = '';
-
-    log (`trying to read database: ${G.config.pathToBase}`);
+    LOG (`trying to read database: ${G.config.pathToBase}`);
     FILE.readOrMake(
         G.config.pathToBase,
-        (content) => FLOW.done ('database is OK', content),
-        newBaseCreated,
-        newBaseContent
+        storeBaseContent,
+        newBaseCreated
     );
 
 
     function newBaseCreated (path, content) {
-        log (`created database file: ${path}`);
-
+        LOG (`created database file: ${path}`);
+        storeBaseContent (content);
+    }
+    function storeBaseContent (content) {
+        G.base.raw = content;
         FLOW.done ('database is OK', content);
     }
 }
 function getBaseTemplate() {
     let defTemplateText =
-    '<name><>\n' +
-    '<tags><>\n' +
-    '<text><m>\n' +
+    '<><name>\n' +
+    '<><tags>\n' +
+    '<m><text>\n' +
     '==============================================================================\n';
 
 
-    log (`trying to read Template for Database parsing: ${G.config.pathToBaseTemplate}`);
+    LOG (`trying to read Template for Database parsing: ${G.config.pathToBaseTemplate}`);
     FILE.readOrMake (
         G.config.pathToBaseTemplate,
         processTemplate,
@@ -106,7 +119,7 @@ function getBaseTemplate() {
 
     function defTemplateFileCreated (path, content) {
 
-        log(`created file for Base Template: ${path}. You may edit it manually.`);
+        LOG (`created file for Base Template: ${path}. You may edit it manually.`);
         processTemplate (content);
     }
     function processTemplate (template) {
@@ -115,30 +128,44 @@ function getBaseTemplate() {
         FLOW.done('template for database is OK');
     }
 }
-function parseBase(base) {
-    let parser = G.base.parser;
-    if (base === undefined || !parser) return;   // async race
+function parseBase() {
+    const baseString = G.base.raw;
+    const parser = G.base.parser;
+    if (baseString === undefined || !parser) return;   // async race
 
-    let data = UTIL.parse (base, parser);
-    if (data instanceof Array) 
-        G.base.data = data;
+
+    let data;
+    if (baseString === '') {
+        data = UTIL.parse (parser.template, parser)  // New empty base
+        G.emptyBase = true;
+    }
+    else data = UTIL.parse (baseString, parser);
+
+
+    if (!(data instanceof Array)) 
+        G.base.data = [data];   // Parser returned only one Record object. Enforce it to be a array.
     else 
-        G.base.data = [data];   // Base must be an array of Records even it's empty
+        G.base.data = data;
+
+
+    delete G.base.raw;
 
     FLOW.done ('base is parsed');
 }
 function getInterfaceTemplate() {
     let defTemplateText =
-    '<text><m>' +
+    '<m><text>' +
+    '\n================================== name ======================================\n' +
+    '<><name>' +
     '\n================================== tags ======================================\n' +
-    '<tags><>' +
+    '<><tags>' +
     '\n================================ commands ====================================\n' +
-    '<commands>add<m>' +
+    '<m>add<command>' +
     '\n========================== tags used previously ==============================\n' +
-    '<tags_used>___any_tag<>';
+    '<>___any_tag<tags_used>\n';
 
 
-    log (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
+    LOG (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
     FILE.readOrMake (
         G.config.pathToInterfaceTemplate,
         processTemplate,
@@ -149,7 +176,7 @@ function getInterfaceTemplate() {
 
     function defTemplateFileCreated (path, content) {
 
-        log(`created file for Interface Template: ${path}. You may edit it manually.`);
+        LOG (`created file for Interface Template: ${path}. You may edit it manually.`);
         processTemplate (content);
     }
     function processTemplate (template) {
@@ -165,15 +192,16 @@ function openTextEditor() {
 
     const config = G.config;
     const shellCommand = `${config.editor} ${config.pathToInterface}`;
-    log(`trying to open Text Editor by command: ${shellCommand}`);
-
+    LOG (`trying to open Text Editor by command: ${shellCommand}`);
 
     // An example of working shell command for Windows CMD
     // shellCommand = 'start "" "c:\\Program Files\\Sublime Text 3\\sublime_text.exe"';
-    const exec = require ('child_process').exec;
-    exec (shellCommand, callback);
+    require ('child_process').exec (shellCommand, callback);
+
     function callback (error, stdout, stderr) {
-        // console.log (error, stdout, stderr)
+        error && console.error ('error: ', error);
+        stdout && console.error ('stdout: ', stdout);
+        stderr && console.error ('stderr: ', stderr);
     }
 
 
@@ -181,7 +209,7 @@ function openTextEditor() {
 }
 function detectInterfaceChanges() {
     const interfaceFile = G.config.pathToInterface;
-    log('detecting changes of Interface File...');
+    LOG ('detecting changes of Interface File...');
 
 
     G.isStartup = false; // Notekeeper is started
@@ -225,8 +253,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = UTIL.stringifyInterface (interface, G.view.parser); // Rendering text interface
-
+    let interfaceText = UTIL.stringifyObj (interface, G.view.parser); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -245,7 +272,7 @@ function executeCommands(interface) {
     const baseParser = G.base.parser;
     let command = interface.command.split ('\n')[0];
     let msg = '';
-    log ('trying to execute command: '+ command);
+    LOG ('trying to execute command: '+ command);
 
 
     const commandsList = {
@@ -253,7 +280,7 @@ function executeCommands(interface) {
         'add': command_add,
         'edit': command_edit,
         'del': command_delete,
-        'clear': command_clear,
+        'clr': command_clear,
         'exit': command_exit,
     };
     commandsList[command]();
@@ -263,7 +290,7 @@ function executeCommands(interface) {
 
     function command_empty() {
 
-        log ('nothing :)\n');
+        LOG ('nothing :)\n');
     }
     function command_clear() {
         interface.text = '';
@@ -346,10 +373,14 @@ function executeCommands(interface) {
         }
 
         function updateBaseFile () {
-            // console.log ( UTIL.stringifyBase (base, baseParser) );
+            // console.LOG ( UTIL.stringifyArr (base, baseParser) );
+            if (G.emptyBase) {
+                G.emptyBase = false;
+                base.shift();
+            }
             FILE.write (
                 G.config.pathToBase,
-                UTIL.stringifyBase (base, baseParser),
+                UTIL.stringifyArr (base, baseParser),
                 () => FLOW.done ('baseFile is updated')
             );
         }
@@ -365,7 +396,7 @@ function showErrorMessage(message) {
 
     G.view.needRestoration = true;
     G.view.dontRead = true;
-    err (msg);
+    ERR (msg);
 
 
     FILE.append (
@@ -375,46 +406,15 @@ function showErrorMessage(message) {
     );
 }
 function closeApp(param) {
-    log (param);
+    LOG (param);
     process.exit ();
 }
 
 
 // CONSOLE LOGGING
-    function log (msg) {
+    function LOG (msg) {
         G.isLogging && console.log ('\x1b[2m%s\x1b[0m', msg);
     }
-    function err(msg) {
+    function ERR (msg) {
         console.log ('\x1b[31m%s\x1b[0m', msg);
     }
-
-
-/*
-function parseTabulation(argument) {
-    const arr = [];
-    let spaces = 0;
-    let line = '';
-    for (let i = 0; i < base.length; i++) {
-        let char = base[i];
-
-        if (char === '\n') {        // End of a line
-            arr.push({'spaces': spaces, 'line': line});
-
-            line = '';
-            spaces = 0;
-        } else {
-            if (!line) {
-                if (char === ' ') {     // somewhere inside a Tabulation
-                    spaces++;
-                } else {
-                    line += char;       // Start of a line
-                }
-            } else {                    // somewhere inside a line
-                line += char;
-            }
-        }
-    }
-    arr.push({'spaces': spaces, 'line': line});     // The last line
-    console.log(arr);
-}
-*/

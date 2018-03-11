@@ -25,35 +25,36 @@ module.exports = {
 
 
     //===================================================================================================
-    //      THESE FUNCTIONS DEPEND ON A CURRENT NOTEKEEPER REALISATION
+    //      PARSER
     //===================================================================================================
-
     createParser (template) { // makes a Regexp with a property contains a list of Template fields (Captures)
         let parser = createRegex (template);
 
-        parser.template = template;
-        parser.captures = this.getRegexCaptures (
+        parser.template = template; // Stores template string parser for future purposes
+        parser.captures = this.getRegexCaptures ( // an array of names of template data fields
             template,
-            /<(\w+)>.*<.*>/g,
-            (matches, result) => result.push (matches[0])
+            /<m>[\s\S]*?<(\w+)>|<>.*<(\w+)>/g,
+            (matches, result) => result.push (matches[0] || matches[1])
         );
         return parser;
 
         function createRegex (template) {
             let mask = template
-                .replace (/<\w+>.*<m>/g, '([\\s\\S]*?)')  // a multi-line field
-                .replace (/<\w+>.*<>/g, '(.*)')          // a single-line field
+                .replace (/<m>[\s\S]*?<\w+>/g, '([\\s\\S]*?)')  // a multi-line field
+                .replace (/<>.*<\w+>/g, '(.*)')          // a single-line field
 
             return new RegExp (mask, 'g');
         }
     },
-    parse (data, parser) { // return a Record object if count of Records == 1, else an array of them
+    parse (inputString, parser) { // return a Record object if count of Records == 1, else an array of them
         let result = this.getRegexCaptures (
-            data,
+            inputString,
             parser,
             (matches, result) => {
                 let record = Object.assign (...parser.captures.map ( (prop, i) => {  // makes Obj from 2 Arrays
-                    let match = matches[i].replace(/<\w+>(.*)<.*>/g, '$1')
+                    let match = matches[i]
+                        .replace(/<m>([\s\S]*?)<\w+>/g, '$1')
+                        .replace(/<>(.*)<\w+>/g, '$1')
                     return { [prop]: match };
                 }) );
 
@@ -64,6 +65,27 @@ module.exports = {
 
         return (result.length == 1)? result[0]: result;
     },
+    stringifyObj (object, parser) { // creates a string from an object according to a Parser's template
+
+        return parser.captures.reduce (insertValuesToTemplate, parser.template);
+
+        function insertValuesToTemplate (template, prop) {
+            let regex = new RegExp ('<.*>[\\s\\S]*?<'+ prop +'>', 'g');
+            let data = object[prop];
+            if (data instanceof Array) data = data.join(', ');
+
+            return template.replace(regex, data);
+        }
+    },
+    stringifyArr (base, parser) { // creates a string from an array of objects according to a Parser's template
+
+        return base.reduce ( (acc, record) => acc + this.stringifyObj (record, parser), '');
+    },
+
+
+    //===================================================================================================
+    //      THESE FUNCTIONS DEPEND ON A CURRENT NOTEKEEPER REALISATION
+    //===================================================================================================
     getUsedTags (base) {
         let tagsArr = base.reduce ((acc, record) => (acc.concat (record.tags.split(', '))), []);
 
@@ -74,23 +96,6 @@ module.exports = {
 
         return Object.assign(...targetRecordFields.map( prop => (
             {[prop]: (note[prop] instanceof Array ? note[prop].join (', ') : note[prop]) }) ) );
-    },
-
-    stringifyInterface (note, parser) { // creates a string from a Template with replaced Props by values from Note object
-
-        return parser.captures.reduce (insertValuesToTemplate, parser.template);
-
-        function insertValuesToTemplate (acc, prop) {
-            let regex = new RegExp ('<'+ prop +'>.*<.*>');
-            let data = note[prop];
-            if (data instanceof Array) data = data.join(', ');
-
-            return acc.replace (regex, data);
-        }
-    },
-    stringifyBase (base, parser) { // creates a string from a Template with replaced Props by values from Note object
-
-        return base.reduce ( (acc, note) => acc + this.stringifyInterface (note, parser), '');
     },
     concatUniqText (acc, addition) {
         if (!acc) return addition;
@@ -111,4 +116,35 @@ module.exports = {
         const res = tags1.concat (tags2);
         return this.removeDuplicatesFrom (res);
     },
+
+
+    /* Future purposes
+    function parseTabulation(argument) {
+        const arr = [];
+        let spaces = 0;
+        let line = '';
+        for (let i = 0; i < base.length; i++) {
+            let char = base[i];
+
+            if (char === '\n') {        // End of a line
+                arr.push({'spaces': spaces, 'line': line});
+
+                line = '';
+                spaces = 0;
+            } else {
+                if (!line) {
+                    if (char === ' ') {     // somewhere inside a Tabulation
+                        spaces++;
+                    } else {
+                        line += char;       // Start of a line
+                    }
+                } else {                    // somewhere inside a line
+                    line += char;
+                }
+            }
+        }
+        arr.push({'spaces': spaces, 'line': line});     // The last line
+        console.log(arr);
+    }
+    */
 }
