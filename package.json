@@ -1,6 +1,6 @@
 {
   "name": "notekeeper",
-  "version": "3.0.0",
+  "version": "3.1.1",
   "description": "A simple cross-platform utility for making notes",
   "main": "notekeeper.js",
   "bin": {
@@ -9,7 +9,8 @@
   "preferGlobal": true,
   "dependencies": {
     "flow-code-description": "^2.0.0",
-    "fs-handy-wraps": "^1.2.0"
+    "fs-handy-wraps": "^1.2.0",
+    "parser-template": "^1.0.1"
   },
   "devDependencies": {},
   "scripts": {

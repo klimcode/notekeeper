@@ -84,10 +84,11 @@ If you specified a name for your note, you will be able to edit it later.
 
 1. Empty -- do nothing
 2. `add` -- save current note to the Database
-3. `edit` -- edit a record specified by a name in the base
-4. `del` -- delete a record specified by a name from the base
-5. `clr` -- clear all fields of the Interface
-6. `exit` -- close the program
+3. `mix` -- concat the record from the base and the new record with the same name. It adds only unique information during a concatenation process.
+4. `edit` -- edit a record specified by a name in the base
+5. `del` -- delete a record specified by a name from the base
+6. `clr` -- clear all fields of the Interface
+7. `exit` -- close the program
 
 .
 

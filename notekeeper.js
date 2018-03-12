@@ -4,6 +4,7 @@
     const PATH = require('path');
     const Flow = require('flow-code-description');
     const FILE = require('fs-handy-wraps');
+    const PARS = require('parser-template');
     const UTIL = require('./utilities');
 
     global.G = {
@@ -123,7 +124,7 @@ function getBaseTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.base.parser = UTIL.createParser (template);
+        G.base.parser = PARS.createParser (template);
 
         FLOW.done('template for database is OK');
     }
@@ -136,10 +137,10 @@ function parseBase() {
 
     let data;
     if (baseString === '') {
-        data = UTIL.parse (parser.template, parser)  // New empty base
+        data = PARS.parse (parser.template, parser)  // New empty base
         G.emptyBase = true;
     }
-    else data = UTIL.parse (baseString, parser);
+    else data = PARS.parse (baseString, parser);
 
 
     if (!(data instanceof Array)) 
@@ -180,8 +181,8 @@ function getInterfaceTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.view.parser = UTIL.createParser (template);
-        G.view.data = UTIL.parse (template, G.view.parser);
+        G.view.parser = PARS.createParser (template);
+        G.view.data = PARS.parse (template, G.view.parser);
 
         FLOW.done('interface is prepared', template);
     }
@@ -229,7 +230,7 @@ function detectInterfaceChanges() {
         );
 
         function parseInterface (content) {
-            let interface = UTIL.parse (content, G.view.parser);
+            let interface = PARS.parse (content, G.view.parser);
 
 
             if (!interface) return FLOW.done ('interface is broken');
@@ -255,7 +256,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = UTIL.stringifyObj (interface, G.view.parser); // Rendering text interface
+    let interfaceText = PARS.stringifyObj (interface, G.view.parser); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -272,22 +273,38 @@ function nope() {/*nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
+    const duplicateIndex = searchDuplicate ();
     let command = interface.command.split ('\n')[0];
     let msg = '';
-    LOG ('trying to execute command: '+ command);
 
 
     const commandsList = {
         '': command_empty,
         'add': command_add,
+        'mix': command_mix,
         'edit': command_edit,
         'del': command_delete,
         'clr': command_clear,
         'exit': command_exit,
     };
+    const m = {
+        empty: `THE TEXT FIELD IS EMPTY.\nIT WILL NOT BE ADDED TO BASE`,
+        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO BASE`,
+        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO BASE`,
+        existsMix: `A RECORD NAMED "${interface.name}"\nALREADY EXISTS.\nMIX WITH IT?`,
+        mixed: `RECORDS NAMED "${interface.name}"\nWERE MIXED.`,
+        addNew: `ADD A NEW RECORD TO THE BASE?`,
+        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED`,
+        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED`,
+    };
+
+
+    LOG ('trying to execute command: '+ command);
     commandsList[command]();
     interface.command = command + (msg? '\n\n'+ msg : '');
     FLOW.done ('interface is refreshed', interface);
+
+
 
 
     function command_empty() {
@@ -305,23 +322,33 @@ function executeCommands(interface) {
     }
 
     function command_add() {
-        const duplicateIndex = searchDuplicate ();
 
         if (duplicateIndex == -1) { // There are no Records in the Base with the same name as a New Note has
 
             if (!interface.text) {
-                msg = `THE TEXT IS EMPTY. IT WILL NOT BE ADDED TO BASE`;
+                msg = m.empty;
             } else {
                 if (!interface.name) {
-                    msg = `NEW UNNAMED RECORD WAS PUSHED TO BASE`;
+                    msg = m.newNoname;
                 } else {
-                    msg = `NEW RECORD NAMED "${interface.name}" WAS PUSHED TO BASE`;
+                    msg = m.newNamed;
                 }
                 pushNewRecordToBase ();
                 updateBaseFile ();
             }
         } else { // The base has already had a record with the same name as a New Note has
-            msg = `A RECORD NAMED "${interface.name}" ALREADY EXISTS. EDIT IT?`;
+            msg = m.existsMix;
+            command = 'mix';
+        }
+    }
+    function command_mix() {
+        const duplicateIndex = searchDuplicate();
+
+        if (duplicateIndex == -1) {
+            msg = m.addNew;
+            command = 'add';
+        } else {
+            msg = m.mixed;
             command = 'edit';
             concatRecords (duplicateIndex); // Shows a Record combined from New Note and existing one. Does not change the Base.
         }
@@ -330,10 +357,10 @@ function executeCommands(interface) {
         const duplicateIndex = searchDuplicate();
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
-            msg = `ADD A NEW RECORD NAMED "${interface.name}" TO THE BASE?`;
+            msg = m.addNew;
             command = 'add';
         } else { // The base has already had a record with the same name as a New Note has
-            msg = `A RECORD NAMED "${interface.name}" WAS SUCCESSFULLY EDITED`;
+            msg = m.edited;
             deleteBaseRecord (duplicateIndex);
             pushNewRecordToBase ();
             updateBaseFile ();
@@ -343,10 +370,10 @@ function executeCommands(interface) {
         const duplicateIndex = searchDuplicate();
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
-            msg = `ADD A NEW RECORD NAMED "${interface.name}" TO THE BASE?`;
+            msg = m.addNew;
             command = 'add';
         } else { // The base has already had a record with the same name as a New Note has
-            msg = `A RECORD NAMED "${interface.name}" IS DELETED`;
+            msg = m.deleted;
             deleteBaseRecord (duplicateIndex);
             updateBaseFile ();
         }
@@ -375,14 +402,13 @@ function executeCommands(interface) {
         }
 
         function updateBaseFile () {
-            // console.LOG ( UTIL.stringifyArr (base, baseParser) );
             if (G.emptyBase) {
                 G.emptyBase = false;
                 base.shift();
             }
             FILE.write (
                 G.config.pathToBase,
-                UTIL.stringifyArr (base, baseParser),
+                PARS.stringifyArr (base, baseParser),
                 () => FLOW.done ('baseFile is updated')
             );
         }
