@@ -8,8 +8,8 @@
   },
   "preferGlobal": true,
   "dependencies": {
-    "flow-code-description": "^1.2.0",
-    "fs-handy-wraps": "^1.1.0"
+    "flow-code-description": "^2.0.0",
+    "fs-handy-wraps": "^1.2.0"
   },
   "devDependencies": {},
   "scripts": {

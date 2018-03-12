@@ -162,7 +162,7 @@ function getInterfaceTemplate() {
     '\n================================ commands ====================================\n' +
     '<m>add<command>' +
     '\n========================== tags used previously ==============================\n' +
-    '<>___any_tag<tags_used>\n';
+    '<>any tag<tags_used>\n';
 
 
     LOG (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
@@ -194,8 +194,10 @@ function openTextEditor() {
     const shellCommand = `${config.editor} ${config.pathToInterface}`;
     LOG (`trying to open Text Editor by command: ${shellCommand}`);
 
-    // An example of working shell command for Windows CMD
+    // An example of working shell command for Windows CMD:
     // shellCommand = 'start "" "c:\\Program Files\\Sublime Text 3\\sublime_text.exe"';
+
+
     require ('child_process').exec (shellCommand, callback);
 
     function callback (error, stdout, stderr) {
