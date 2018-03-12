@@ -293,12 +293,18 @@ function executeCommands(interface) {
         addNew: `ADD A NEW RECORD TO THE BASE?`,
         edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED`,
         deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED`,
+        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST`
     };
 
 
     LOG ('trying to execute command: '+ command);
-    commandsList[command]();
-    interface.command = command + (msg? '\n\n'+ msg : '');
+    try {
+        commandsList[command]();
+    } catch (e) {
+        msg = m.wrongCommand;
+        ERR (m.wrongCommand + '\n');
+    }
+    interface.command = command + (msg? '\n'+ msg : '');
     FLOW.done ('interface is refreshed', interface);
 
 

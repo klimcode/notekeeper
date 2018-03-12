@@ -29,10 +29,9 @@ It's ok to skip all answers to use default settings (`base.txt`, `new_note.txt`,
 
 
 ### Text Editors
-Notekeeper was well tested with **Sublime Text** only. 
+Notekeeper was well tested with **Sublime Text 3**, **Atom**, **VS CODE** on Linux. 
 It should work with any text editor which can be executed by a shell command `<editor> <filepath>`. 
-Your text editor must support hot reloading of externally edited files. 
-The info about other text editors will be added soon.
+Your text editor must support hot reloading of externally edited files.
 
 .
 
