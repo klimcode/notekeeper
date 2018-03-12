@@ -1,5 +1,5 @@
 module.exports = {
-    removeDuplicatesFrom (arr) {
+    removeDuplicates (arr) {
 
         return arr.filter ((el, pos, a) => (a.indexOf(el) == pos) && el );
     },
@@ -13,13 +13,13 @@ module.exports = {
 
         return result;
     },
-    prettifyTagsList (input) { // "a, b ,,b   ,,  c,d,d" ==> [a, b, c, d]
+    prettifyList (input) { // "a, b ,,b   ,,  c,d,d" ==> [a, b, c, d]
         let tags = input
             .split (',')
             .map (s => s.trim())
             .filter (s => s != '');
 
-        return this.removeDuplicatesFrom (tags);
+        return this.removeDuplicates (tags);
     },
 
 
@@ -27,15 +27,9 @@ module.exports = {
     //      THESE FUNCTIONS DEPEND ON A CURRENT NOTEKEEPER REALISATION
     //===================================================================================================
     getUsedTags (base) {
-        let tagsArr = base.reduce ((acc, record) => (acc.concat (record.tags.split(', '))), []);
+        let tagsArr = base.reduce ((acc, record) => (acc.concat (record.tags)), []);
 
-        return this.removeDuplicatesFrom (tagsArr);
-    },
-    convertToBaseRecord (note, parser) {
-        const targetRecordFields = parser.captures;
-
-        return Object.assign(...targetRecordFields.map( prop => (
-            {[prop]: (note[prop] instanceof Array ? note[prop].join (', ') : note[prop]) }) ) );
+        return this.removeDuplicates (tagsArr);
     },
     concatUniqText (acc, addition) {
         if (!acc) return addition;
@@ -54,7 +48,7 @@ module.exports = {
         if (!tags2.length) return tags1;
 
         const res = tags1.concat (tags2);
-        return this.removeDuplicatesFrom (res);
+        return this.removeDuplicates (res);
     },
 
 

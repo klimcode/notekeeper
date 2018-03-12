@@ -130,26 +130,24 @@ function getBaseTemplate() {
     }
 }
 function parseBase() {
-    const baseString = G.base.raw;
     const parser = G.base.parser;
-    if (baseString === undefined || !parser) return;   // async race
-
-
     let data;
-    if (baseString === '') {
+    if (G.base.raw === undefined || !parser) return;   // async race
+
+
+    if (G.base.raw === '') {
         data = PARS.parse (parser.template, parser)  // New empty base
         G.emptyBase = true;
     }
-    else data = PARS.parse (baseString, parser);
-
-
-    if (!(data instanceof Array)) 
-        G.base.data = [data];   // Parser returned only one Record object. Enforce it to be a array.
-    else 
-        G.base.data = data;
-
-
+    else data = PARS.parse (G.base.raw, parser);
     delete G.base.raw;
+
+
+    data = data instanceof Array ? data : [data]; // if Parser returned only one Record object -> enforce it to be an array.
+    data.forEach (record => record.tags = record.tags.split (', '));
+
+    G.base.data = data;
+    console.log(data);
 
     FLOW.done ('base is parsed');
 }
@@ -235,7 +233,7 @@ function detectInterfaceChanges() {
 
             if (!interface) return FLOW.done ('interface is broken');
 
-            interface.tags = UTIL.prettifyTagsList (interface.tags);
+            interface.tags = UTIL.prettifyList (interface.tags);
             G.view.data = interface;
 
             FLOW.done('interface is changed', interface);
@@ -256,7 +254,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = PARS.stringifyObj (interface, G.view.parser); // Rendering text interface
+    let interfaceText = PARS.fillTemplate (interface, G.view.parser); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -388,7 +386,7 @@ function executeCommands(interface) {
         }
         function pushNewRecordToBase () {
 
-            G.base.data.push ( UTIL.convertToBaseRecord (interface, baseParser) );
+            G.base.data.push ( PARS.filterObject (interface, baseParser) );
         }
         function concatRecords (index) { // Mutates New Note in the Interface
             let baseRecord = base[index];
@@ -406,9 +404,10 @@ function executeCommands(interface) {
                 G.emptyBase = false;
                 base.shift();
             }
+            // console.log(PARS.fillTemplatesArray (base, baseParser));
             FILE.write (
                 G.config.pathToBase,
-                PARS.stringifyArr (base, baseParser),
+                PARS.fillTemplatesArray (base, baseParser),
                 () => FLOW.done ('baseFile is updated')
             );
         }
