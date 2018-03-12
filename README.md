@@ -94,10 +94,22 @@ If you specified a name for your note, you will be able to edit it later.
 
 ## Templates
 
-You may change a view of the Notekeeper's Interface. It's stored in `template_interface.txt`. The fields are marked by tags like this `<m>...<text>`. A tag contains 3 parts:
+You may change a view of the Notekeeper's Interface. It's stored in `template_interface.txt`. The fields are marked by tags like this: `<m>...<text>`. A tag consists of 3 parts:
 
 1. "start" means a type of the field. Only 2 types are available: a **single-line** and a **multi-line**.
-2. "value" for defaults
-3. "end" means a name the field.
+2. "value". The default value for the "command" field is `add`.
+3. "end" stores a name of the field.
 
-There must be at least one any symbol between the tags. This template will not be parsed correctly: `<><text><><tags>`. 
+There must be at least one any symbol between the tags. This template will not be parsed correctly: `<><text><><tags>`.  
+
+Here is an example of minimalistic template for the Interface:
+```
+<m><text>
+=========================== name, tags, commands ===========================
+<><name>
+<><tags>
+<m>add<command>
+=========================== tags used previously ===========================
+<>tag<tags_used>
+
+```
