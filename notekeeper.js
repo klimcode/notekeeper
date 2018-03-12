@@ -147,7 +147,6 @@ function parseBase() {
     data.forEach (record => record.tags = record.tags.split (', '));
 
     G.base.data = data;
-    console.log(data);
 
     FLOW.done ('base is parsed');
 }
