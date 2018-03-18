@@ -21,6 +21,9 @@ module.exports = {
 
         return this.removeDuplicates (tags);
     },
+    isEqual (str1, str2) {
+        return str1.toLowerCase().trim() === str2.toLowerCase().trim();
+    },
 
 
     //===================================================================================================

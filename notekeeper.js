@@ -144,11 +144,81 @@ function parseBase() {
 
 
     data = data instanceof Array ? data : [data]; // if Parser returned only one Record object -> enforce it to be an array.
-    data.forEach (record => record.tags = record.tags.split (', '));
+    data.forEach (record => record.tags = record.tags.trim().split (', '));
 
     G.base.data = data;
+    G.base.struct = setLeveles (data);
+    sortStructure (G.base.struct);
 
     FLOW.done ('base is parsed');
+    console.log('setLeveles\n\n', G.base.struct);return;
+
+
+    function setLeveles (base) {
+        return base.filter (rec => {
+            if (!rec.text.trim()) return false;     // removes empty records
+
+            let level = getAndSetLevel (base, rec);
+            if (level < 9) return true;
+        });
+    }
+    function getAndSetLevel (base, record) {
+        let level = 0;
+        let parent = base [getParentId (base, record)];
+
+        if (parent) {
+            level++;
+            if (parent.level === undefined)
+                getAndSetLevel (base, parent);
+            else
+                level = parent.level + 1;
+        }
+
+        record.level = level;
+        return level;
+    }
+    function getParentId (base, record) {
+        let tag = record.tags[0];
+        if (!tag) return null;
+
+        for (let i=0; i<base.length; i++) {
+            if (UTIL.isEqual (base[i].name, tag)) {
+                return i;
+            }
+        }
+        return null;
+    }
+    function sortStructure (base) {
+        sortBylevels (base);
+        
+        for (let i=0; i<base.length-2; i++) {
+            let j = i+1;
+            let record = base[i];
+            let next = base[j];
+            
+            // All steps before this line are correct!
+            // Need to make a list of direct children for each record
+            for (let k=j; k<base.length-1; k++) {
+                let possibleChild = base[k];
+                if (isChild (possibleChild, record)) {
+                    (k != j) && changePos (base, k, j);
+                    j++;
+                }
+            }
+        }
+
+        function sortBylevels (arr) {
+            arr.sort ((a,b) => a.level - b.level);
+        }
+        function isChild (candidate, record) {
+            return (candidate.level === record.level + 1) && // check level
+                UTIL.isEqual (candidate.tags[0], record.name);
+        }
+        function changePos (arr, from, to) {
+            let item = arr.splice (from, 1)[0];
+            arr.splice (to, 0, item);
+        }
+    }
 }
 function getInterfaceTemplate() {
     let defTemplateText =
@@ -184,7 +254,7 @@ function getInterfaceTemplate() {
         FLOW.done('interface is prepared', template);
     }
 }
-function openTextEditor() {
+function openTextEditor() {return FLOW.done('finish');
     if (G.view.isEditorOpened) return;
 
 
@@ -285,15 +355,15 @@ function executeCommands(interface) {
         'exit': command_exit,
     };
     const m = {
-        empty: `THE TEXT FIELD IS EMPTY.\nIT WILL NOT BE ADDED TO BASE`,
-        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO BASE`,
-        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO BASE`,
+        empty: `THE TEXT FIELD IS EMPTY.\nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
+        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
+        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO THE BASE.`,
         existsMix: `A RECORD NAMED "${interface.name}"\nALREADY EXISTS.\nMIX WITH IT?`,
         mixed: `RECORDS NAMED "${interface.name}"\nWERE MIXED.`,
         addNew: `ADD A NEW RECORD TO THE BASE?`,
-        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED`,
-        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED`,
-        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST`
+        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED.`,
+        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED.`,
+        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST.`
     };
 
 
