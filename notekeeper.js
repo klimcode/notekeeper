@@ -147,78 +147,8 @@ function parseBase() {
     data.forEach (record => record.tags = record.tags.trim().split (', '));
 
     G.base.data = data;
-    G.base.struct = setLeveles (data);
-    sortStructure (G.base.struct);
-
+    
     FLOW.done ('base is parsed');
-    console.log('setLeveles\n\n', G.base.struct);return;
-
-
-    function setLeveles (base) {
-        return base.filter (rec => {
-            if (!rec.text.trim()) return false;     // removes empty records
-
-            let level = getAndSetLevel (base, rec);
-            if (level < 9) return true;
-        });
-    }
-    function getAndSetLevel (base, record) {
-        let level = 0;
-        let parent = base [getParentId (base, record)];
-
-        if (parent) {
-            level++;
-            if (parent.level === undefined)
-                getAndSetLevel (base, parent);
-            else
-                level = parent.level + 1;
-        }
-
-        record.level = level;
-        return level;
-    }
-    function getParentId (base, record) {
-        let tag = record.tags[0];
-        if (!tag) return null;
-
-        for (let i=0; i<base.length; i++) {
-            if (UTIL.isEqual (base[i].name, tag)) {
-                return i;
-            }
-        }
-        return null;
-    }
-    function sortStructure (base) {
-        sortBylevels (base);
-        
-        for (let i=0; i<base.length-2; i++) {
-            let j = i+1;
-            let record = base[i];
-            let next = base[j];
-            
-            // All steps before this line are correct!
-            // Need to make a list of direct children for each record
-            for (let k=j; k<base.length-1; k++) {
-                let possibleChild = base[k];
-                if (isChild (possibleChild, record)) {
-                    (k != j) && changePos (base, k, j);
-                    j++;
-                }
-            }
-        }
-
-        function sortBylevels (arr) {
-            arr.sort ((a,b) => a.level - b.level);
-        }
-        function isChild (candidate, record) {
-            return (candidate.level === record.level + 1) && // check level
-                UTIL.isEqual (candidate.tags[0], record.name);
-        }
-        function changePos (arr, from, to) {
-            let item = arr.splice (from, 1)[0];
-            arr.splice (to, 0, item);
-        }
-    }
 }
 function getInterfaceTemplate() {
     let defTemplateText =
@@ -254,7 +184,7 @@ function getInterfaceTemplate() {
         FLOW.done('interface is prepared', template);
     }
 }
-function openTextEditor() {return FLOW.done('finish');
+function openTextEditor() {  //return FLOW.done('finish'); 
     if (G.view.isEditorOpened) return;
 
 
@@ -340,7 +270,7 @@ function nope() {/*nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
-    const duplicateIndex = searchDuplicate ();
+    const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
     let command = interface.command.split ('\n')[0];
     let msg = '';
 
@@ -352,6 +282,7 @@ function executeCommands(interface) {
         'edit': command_edit,
         'del': command_delete,
         'clr': command_clear,
+        'tree': command_tree,
         'exit': command_exit,
     };
     const m = {
@@ -373,6 +304,7 @@ function executeCommands(interface) {
     } catch (e) {
         msg = m.wrongCommand;
         ERR (m.wrongCommand + '\n');
+        console.log(e);
     }
     interface.command = command + (msg? '\n'+ msg : '');
     FLOW.done ('interface is refreshed', interface);
@@ -415,7 +347,7 @@ function executeCommands(interface) {
         }
     }
     function command_mix() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) {
             msg = m.addNew;
@@ -427,7 +359,7 @@ function executeCommands(interface) {
         }
     }
     function command_edit() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
@@ -440,7 +372,7 @@ function executeCommands(interface) {
         }
     }
     function command_delete() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
@@ -452,13 +384,21 @@ function executeCommands(interface) {
         }
     }
 
+    // TESTING
+    function command_tree() {
+        let time = UTIL.clock();
+
+    
+        const treeParser = PARS.createParser ('<><name>\n<m><text>\n\n\n');
+        const treeString = PARS.fillTemplatesArray (UTIL.treeView (base), treeParser);
+        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
+        interface.text = treeString;
+        command = 'clr';
+    }
+
+
+
     // Utility functions
-        function searchDuplicate () {
-            let newName = interface.name;
-            return newName ?
-                base.findIndex (record => record.name.toLowerCase() === newName.toLowerCase() ) :
-                -1;     // empty name equals to uniq name
-        }
         function pushNewRecordToBase () {
 
             G.base.data.push ( PARS.filterObject (interface, baseParser) );
@@ -473,8 +413,7 @@ function executeCommands(interface) {
 
             base.splice (index, 1);
         }
-
-        function updateBaseFile () {
+        function updateBaseFile () { // Mutates Base File !
             if (G.emptyBase) {
                 G.emptyBase = false;
                 base.shift();
