@@ -4,7 +4,7 @@
     const PATH = require('path');
     const Flow = require('flow-code-description');
     const FILE = require('fs-handy-wraps');
-    const PARS = require('parser-template');
+    const PARSER = require('parser-template');
     const UTIL = require('./utilities');
 
     global.G = {
@@ -124,27 +124,27 @@ function getBaseTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.base.parser = PARS.createParser (template);
+        G.base.parser = new PARSER (template);
 
         FLOW.done('template for database is OK');
     }
 }
 function parseBase() {
-    const parser = G.base.parser;
+    const baseBarser = G.base.parser;
     let data;
-    if (G.base.raw === undefined || !parser) return;   // async race
+    if (G.base.raw === undefined || !baseBarser) return;   // async race
 
 
     if (G.base.raw === '') {
-        data = PARS.parse (parser.template, parser)  // New empty base
+        data = baseBarser.parse (baseBarser.template)  // New empty base
         G.emptyBase = true;
     }
-    else data = PARS.parse (G.base.raw, parser);
+    else data = baseBarser.parse (G.base.raw);
     delete G.base.raw;
 
 
     data = data instanceof Array ? data : [data]; // if Parser returned only one Record object -> enforce it to be an array.
-    data.forEach (record => record.tags = record.tags.trim().split (', '));
+    data.forEach (record => record.tags = record.tags.trim().split (', ')); // convert tags to Array
 
     G.base.data = data;
     
@@ -178,8 +178,9 @@ function getInterfaceTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.view.parser = PARS.createParser (template);
-        G.view.data = PARS.parse (template, G.view.parser);
+        let interfaceParser = new PARSER (template);
+        G.view.parser = interfaceParser;
+        G.view.data = interfaceParser.parse (template);
 
         FLOW.done('interface is prepared', template);
     }
@@ -227,7 +228,7 @@ function detectInterfaceChanges() {
         );
 
         function parseInterface (content) {
-            let interface = PARS.parse (content, G.view.parser);
+            let interface = G.view.parser.parse (content);
 
 
             if (!interface) return FLOW.done ('interface is broken');
@@ -253,7 +254,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = PARS.fillTemplate (interface, G.view.parser); // Rendering text interface
+    let interfaceText = G.view.parser.fillTemplate (interface); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -303,7 +304,7 @@ function executeCommands(interface) {
         commandsList[command]();
     } catch (e) {
         msg = m.wrongCommand;
-        ERR (m.wrongCommand + '\n');
+        ERR (m.wrongCommand);
         console.log(e);
     }
     interface.command = command + (msg? '\n'+ msg : '');
@@ -320,6 +321,7 @@ function executeCommands(interface) {
         interface.text = '';
         interface.name = '';
         interface.tags = '';
+        command = 'add';
     }
     function command_exit() {
 
@@ -386,13 +388,12 @@ function executeCommands(interface) {
 
     // TESTING
     function command_tree() {
-        let time = UTIL.clock();
+        const time = UTIL.clock();
+        const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
+        const treeString = treeParser.fillTemplatesArray (UTIL.treeView (base));
 
-    
-        const treeParser = PARS.createParser ('<><name>\n<m><text>\n\n\n');
-        const treeString = PARS.fillTemplatesArray (UTIL.treeView (base), treeParser);
-        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         interface.text = treeString;
+        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         command = 'clr';
     }
 
@@ -401,7 +402,7 @@ function executeCommands(interface) {
     // Utility functions
         function pushNewRecordToBase () {
 
-            G.base.data.push ( PARS.filterObject (interface, baseParser) );
+            G.base.data.push ( baseParser.filterObject (interface) );
         }
         function concatRecords (index) { // Mutates New Note in the Interface
             let baseRecord = base[index];
@@ -418,10 +419,10 @@ function executeCommands(interface) {
                 G.emptyBase = false;
                 base.shift();
             }
-            // console.log(PARS.fillTemplatesArray (base, baseParser));
+            // console.log(baseParser.fillTemplatesArray (base));
             FILE.write (
                 G.config.pathToBase,
-                PARS.fillTemplatesArray (base, baseParser),
+                baseParser.fillTemplatesArray (base),
                 () => FLOW.done ('baseFile is updated')
             );
         }
