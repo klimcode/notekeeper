@@ -4,7 +4,7 @@
     const PATH = require('path');
     const Flow = require('flow-code-description');
     const FILE = require('fs-handy-wraps');
-    const PARS = require('parser-template');
+    const PARSER = require('parser-template');
     const UTIL = require('./utilities');
 
     global.G = {
@@ -124,30 +124,30 @@ function getBaseTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.base.parser = PARS.createParser (template);
+        G.base.parser = new PARSER (template);
 
         FLOW.done('template for database is OK');
     }
 }
 function parseBase() {
-    const parser = G.base.parser;
+    const baseBarser = G.base.parser;
     let data;
-    if (G.base.raw === undefined || !parser) return;   // async race
+    if (G.base.raw === undefined || !baseBarser) return;   // async race
 
 
     if (G.base.raw === '') {
-        data = PARS.parse (parser.template, parser)  // New empty base
+        data = baseBarser.parse (baseBarser.template)  // New empty base
         G.emptyBase = true;
     }
-    else data = PARS.parse (G.base.raw, parser);
+    else data = baseBarser.parse (G.base.raw);
     delete G.base.raw;
 
 
     data = data instanceof Array ? data : [data]; // if Parser returned only one Record object -> enforce it to be an array.
-    data.forEach (record => record.tags = record.tags.split (', '));
+    data.forEach (record => record.tags = record.tags.trim().split (', ')); // convert tags to Array
 
     G.base.data = data;
-
+    
     FLOW.done ('base is parsed');
 }
 function getInterfaceTemplate() {
@@ -178,13 +178,14 @@ function getInterfaceTemplate() {
         processTemplate (content);
     }
     function processTemplate (template) {
-        G.view.parser = PARS.createParser (template);
-        G.view.data = PARS.parse (template, G.view.parser);
+        let interfaceParser = new PARSER (template);
+        G.view.parser = interfaceParser;
+        G.view.data = interfaceParser.parse (template);
 
         FLOW.done('interface is prepared', template);
     }
 }
-function openTextEditor() {
+function openTextEditor() {  //return FLOW.done('finish'); 
     if (G.view.isEditorOpened) return;
 
 
@@ -227,7 +228,7 @@ function detectInterfaceChanges() {
         );
 
         function parseInterface (content) {
-            let interface = PARS.parse (content, G.view.parser);
+            let interface = G.view.parser.parse (content);
 
 
             if (!interface) return FLOW.done ('interface is broken');
@@ -253,7 +254,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = PARS.fillTemplate (interface, G.view.parser); // Rendering text interface
+    let interfaceText = G.view.parser.fillTemplate (interface); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -270,7 +271,7 @@ function nope() {/*nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
-    const duplicateIndex = searchDuplicate ();
+    const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
     let command = interface.command.split ('\n')[0];
     let msg = '';
 
@@ -282,18 +283,19 @@ function executeCommands(interface) {
         'edit': command_edit,
         'del': command_delete,
         'clr': command_clear,
+        'tree': command_tree,
         'exit': command_exit,
     };
     const m = {
-        empty: `THE TEXT FIELD IS EMPTY.\nIT WILL NOT BE ADDED TO BASE`,
-        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO BASE`,
-        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO BASE`,
+        empty: `THE TEXT FIELD IS EMPTY.\nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
+        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
+        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO THE BASE.`,
         existsMix: `A RECORD NAMED "${interface.name}"\nALREADY EXISTS.\nMIX WITH IT?`,
         mixed: `RECORDS NAMED "${interface.name}"\nWERE MIXED.`,
         addNew: `ADD A NEW RECORD TO THE BASE?`,
-        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED`,
-        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED`,
-        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST`
+        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED.`,
+        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED.`,
+        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST.`
     };
 
 
@@ -302,7 +304,8 @@ function executeCommands(interface) {
         commandsList[command]();
     } catch (e) {
         msg = m.wrongCommand;
-        ERR (m.wrongCommand + '\n');
+        ERR (m.wrongCommand);
+        console.log(e);
     }
     interface.command = command + (msg? '\n'+ msg : '');
     FLOW.done ('interface is refreshed', interface);
@@ -318,6 +321,7 @@ function executeCommands(interface) {
         interface.text = '';
         interface.name = '';
         interface.tags = '';
+        command = 'add';
     }
     function command_exit() {
 
@@ -345,7 +349,7 @@ function executeCommands(interface) {
         }
     }
     function command_mix() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) {
             msg = m.addNew;
@@ -357,7 +361,7 @@ function executeCommands(interface) {
         }
     }
     function command_edit() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
@@ -370,7 +374,7 @@ function executeCommands(interface) {
         }
     }
     function command_delete() {
-        const duplicateIndex = searchDuplicate();
+        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
@@ -382,16 +386,23 @@ function executeCommands(interface) {
         }
     }
 
+    // TESTING
+    function command_tree() {
+        const time = UTIL.clock();
+        const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
+        const treeString = treeParser.fillTemplatesArray (UTIL.treeView (base));
+
+        interface.text = treeString;
+        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
+        command = 'clr';
+    }
+
+
+
     // Utility functions
-        function searchDuplicate () {
-            let newName = interface.name;
-            return newName ?
-                base.findIndex (record => record.name.toLowerCase() === newName.toLowerCase() ) :
-                -1;     // empty name equals to uniq name
-        }
         function pushNewRecordToBase () {
 
-            G.base.data.push ( PARS.filterObject (interface, baseParser) );
+            G.base.data.push ( baseParser.filterObject (interface) );
         }
         function concatRecords (index) { // Mutates New Note in the Interface
             let baseRecord = base[index];
@@ -403,16 +414,15 @@ function executeCommands(interface) {
 
             base.splice (index, 1);
         }
-
-        function updateBaseFile () {
+        function updateBaseFile () { // Mutates Base File !
             if (G.emptyBase) {
                 G.emptyBase = false;
                 base.shift();
             }
-            // console.log(PARS.fillTemplatesArray (base, baseParser));
+            // console.log(baseParser.fillTemplatesArray (base));
             FILE.write (
                 G.config.pathToBase,
-                PARS.fillTemplatesArray (base, baseParser),
+                baseParser.fillTemplatesArray (base),
                 () => FLOW.done ('baseFile is updated')
             );
         }

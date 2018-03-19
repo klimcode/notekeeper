@@ -1,6 +1,6 @@
 {
   "name": "notekeeper",
-  "version": "3.1.5",
+  "version": "3.2.0",
   "description": "A simple cross-platform utility for making notes",
   "main": "notekeeper.js",
   "bin": {
@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Anilator/notekeeper.git"
+    "url": "git+https://github.com/klimcode/notekeeper.git"
   },
   "keywords": [
     "notes",
@@ -27,7 +27,7 @@
   "author": "Evgenii Klimov",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Anilator/notekeeper/issues"
+    "url": "https://github.com/klimcode/notekeeper/issues"
   },
-  "homepage": "https://github.com/Anilator/notekeeper#readme"
+  "homepage": "https://github.com/klimcode/notekeeper#readme"
 }

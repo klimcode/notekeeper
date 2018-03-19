@@ -1,12 +1,8 @@
-# Notekeeper user settings
-config.json
-interface.txt
-base.txt
-note.txt
-
-# Sublime project files
+# IDE workspaces
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
+.vscode
 
 # Logs
 logs
