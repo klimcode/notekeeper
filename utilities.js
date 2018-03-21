@@ -65,90 +65,68 @@ module.exports = {
 
 
     // TREE VIEW
-    treeView (inputBase) {
+    treeView (mainBase) {
         const isEqual = this.isEqual;
-        let base = setLeveles (inputBase);
-        sortStructure (base);
-        transformView (base);
-        return base;
-   
-    
-        function setLeveles (base) {
-            return base.filter (rec => {
-                if (!rec.text.trim()) return false;     // removes empty records
-    
-                let level = getAndSetLevel (base, rec);
-                if (level < 9) return true;
+        let tree = [];  
+        let root = { _childrenIds: [] };
+
+
+        mainBase.forEach ((record, i) => { // set IDs, parents and children
+            if (!record.text.trim()) return; // jump over empty records
+            record._id = i;
+            record._parentsIds = getParentsIds (record.tags, mainBase);  // find Ids of all parents (tags)
+            setChild (record, mainBase, root);  // register the record in each parent's record as a child
+        });
+
+        makeTree (root, mainBase, tree);
+
+        
+        return tree;
+
+        function getParentsIds (parents, base) {
+            let len = parents.length;
+            if (!len || !parents[0]) return ['root'];
+
+            let parentIds = Array (len);
+            for (let i=0; i<len; i++) {
+                let tag = parents[i];
+                let id = base.findIndex (e => isEqual (e.name, tag));
+
+                if (id !== -1) parentIds[i] = id;
+                else parentIds[i] = 'root'; 
+            };
+            return parentIds;
+        }
+        function setChild (record, base, root) {
+            let parents = record._parentsIds;
+            for (let i=0; i<parents.length; i++) {
+                let parentId = parents[i];
+                let parent = parentId === 'root' ? root : base[parentId];
+                if (!parent._childrenIds) parent._childrenIds = [record._id];
+                else parent._childrenIds.push (record._id);
+            }
+        }
+        function makeTree (root, base, tree) {
+            if (!root._childrenIds) return;
+
+            let level = root.level || 1;
+
+            root._childrenIds.forEach (childId => {
+                let child = base[childId];
+                child.level = level + 1;
+
+                let record = {
+                    name: indent (child.name, child.level),
+                    text: indent (child.text, child.level)
+                };
+                tree.push (record);
+
+                makeTree (child, base, tree);
             });
         }
-        function getAndSetLevel (base, record) {
-            let level = 0;
-            let parent = base [getParentId (base, record)];
-    
-            if (parent) {
-                level++;
-                if (parent.level === undefined)
-                    getAndSetLevel (base, parent);
-                else
-                    level = parent.level + 1;
-            }
-    
-            record.level = level;
-            return level;
-        }
-        function getParentId (base, record) {
-            let tag = record.tags[0];
-            if (!tag) return null;
-    
-            for (let i=0; i<base.length; i++) {
-                if (isEqual (base[i].name, tag)) {
-                    return i;
-                }
-            }
-            return null;
-        }
-        function sortStructure (base) {
-            sortBylevels (base);
-            
-            for (let i=0; i<base.length-2; i++) {
-                let j = i+1;
-                let record = base[i];
-                let next = base[j];
-                
-                // All steps before this line are correct!
-                // Need to make a list of direct children for each record
-                for (let k=j; k<base.length; k++) {
-                    let possibleChild = base[k];
-                    if (isChild (possibleChild, record)) {
-                        (k != j) && changePos (base, k, j);
-                        j++;
-                    }
-                }
-            }
-    
-            function sortBylevels (arr) {
-                arr.sort ((a,b) => a.level - b.level);
-            }
-            function isChild (candidate, record) {
-                return (candidate.level === record.level + 1) && // check level
-                    isEqual (candidate.tags[0], record.name);
-            }
-            function changePos (arr, from, to) {
-                let item = arr.splice (from, 1)[0];
-                arr.splice (to, 0, item);
-            }
-        }
-        function transformView (base) {
-            base.forEach (rec => {
-                if (!rec.level) return;
-    
-                let padding = Array (rec.level * 2 + 1).join (' ');
-                rec.name = padding + rec.name;
-                rec.text = rec.text
-                    .split('\n')
-                    .map(t => padding + t)
-                    .join('\n');
-            });
+        function indent (string, n) {
+            let padding = Array(n).join('  ');
+            return string.split('\n').map(l => padding + l).join('\n');
         }
     },
 

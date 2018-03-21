@@ -31,7 +31,7 @@ FLOW.steps = {
     'interface is ready to use': [ openTextEditor, detectInterfaceChanges ],
 
     // change detection and commands execution
-    'interface is changed': executeCommands,
+    'interface is changed': [ executeCommands, test ],
     'interface is refreshed': renderInterface,
     'baseFile is updated': nope,
     'interface is restored': renderInterface,
@@ -180,7 +180,7 @@ function getInterfaceTemplate() {
     function processTemplate (template) {
         let interfaceParser = new PARSER (template);
         G.view.parser = interfaceParser;
-        G.view.data = interfaceParser.parse (template);
+        G.view.data = interfaceParser.parse (template)[0];
 
         FLOW.done('interface is prepared', template);
     }
@@ -228,7 +228,7 @@ function detectInterfaceChanges() {
         );
 
         function parseInterface (content) {
-            let interface = G.view.parser.parse (content);
+            let interface = G.view.parser.parse (content)[0];
 
 
             if (!interface) return FLOW.done ('interface is broken');
@@ -254,7 +254,7 @@ function renderInterface() {
     if (tagsUsed.length) interface.tags_used = tagsUsed;
 
 
-    let interfaceText = G.view.parser.fillTemplate (interface); // Rendering text interface
+    let interfaceText = G.view.parser.stringify (interface); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
     G.view.needRestoration = false; // Interface is restored
@@ -390,7 +390,7 @@ function executeCommands(interface) {
     function command_tree() {
         const time = UTIL.clock();
         const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
-        const treeString = treeParser.fillTemplatesArray (UTIL.treeView (base));
+        const treeString = treeParser.stringify (UTIL.treeView (base));
 
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
@@ -419,10 +419,10 @@ function executeCommands(interface) {
                 G.emptyBase = false;
                 base.shift();
             }
-            // console.log(baseParser.fillTemplatesArray (base));
+            // console.log(baseParser.stringify (base));
             FILE.write (
                 G.config.pathToBase,
-                baseParser.fillTemplatesArray (base),
+                baseParser.stringify (base),
                 () => FLOW.done ('baseFile is updated')
             );
         }
@@ -450,6 +450,24 @@ function showErrorMessage(message) {
 function closeApp(param) {
     LOG (param);
     process.exit ();
+}
+
+
+function test(param) {
+    command_tree()
+    process.exit ();
+
+
+
+    function command_tree() {
+        const time = UTIL.clock();
+        const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
+        const treeString = treeParser.stringify (UTIL.treeView (G.base.data));
+
+        interface.text = treeString;
+        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
+        command = 'clr';
+    }
 }
 
 
