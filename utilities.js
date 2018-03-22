@@ -109,24 +109,20 @@ module.exports = {
         function makeTree (root, base, tree) {
             if (!root._childrenIds) return;
 
-            let level = root.level || 1;
+            let level = root.level || 0;
 
             root._childrenIds.forEach (childId => {
                 let child = base[childId];
                 child.level = level + 1;
 
-                let record = {
-                    name: indent (child.name, child.level),
-                    text: indent (child.text, child.level)
-                };
-                tree.push (record);
+                tree.push ({
+                    name: child.name,
+                    text: child.text,
+                    $indent: child.level,
+                });
 
                 makeTree (child, base, tree);
             });
-        }
-        function indent (string, n) {
-            let padding = Array(n).join('  ');
-            return string.split('\n').map(l => padding + l).join('\n');
         }
     },
 

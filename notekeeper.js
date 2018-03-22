@@ -23,7 +23,7 @@ FLOW.steps = {
     // startup steps
     'start': makeHomedir,
     'home directory is OK': getConfig,
-    'config is OK': [ getBase, getBaseTemplate, getInterfaceTemplate ],
+    'config is OK': [ getBase, getBaseTemplate, getInterfaceTemplate, getTreeTemplate ],
     'database is OK': parseBase,
     'template for database is OK': parseBase,
     'base is parsed': renderInterface,
@@ -60,6 +60,7 @@ function getConfig(dir) { // TODO: separate CLI and Config file creation
         pathToBaseTemplate:     PATH.join( dir, 'template_base.txt' ),
         pathToInterface:        PATH.join( dir, 'new_note.txt' ),
         pathToInterfaceTemplate: PATH.join( dir, 'template_interface.txt' ),
+        pathToTreeTemplate:     PATH.join( dir, 'template_tree.txt' ),
         editor: 'subl',
     };
     const CLIQuestions = [
@@ -163,7 +164,7 @@ function getInterfaceTemplate() {
     '<>any tag<tags_used>\n';
 
 
-    LOG (`trying to read text interface from file: ${G.config.pathToInterfaceTemplate}`);
+    LOG (`trying to read interface template from file: ${G.config.pathToInterfaceTemplate}`);
     FILE.readOrMake (
         G.config.pathToInterfaceTemplate,
         processTemplate,
@@ -183,6 +184,31 @@ function getInterfaceTemplate() {
         G.view.data = interfaceParser.parse (template)[0];
 
         FLOW.done('interface is prepared', template);
+    }
+}
+function getTreeTemplate() {
+    let defTemplateText =
+    '<><name>\n' +
+    '<m><text>\n' +
+    '~~~\n';
+
+
+    LOG (`trying to read tree template from file: ${G.config.pathToTreeTemplate}`);
+    FILE.readOrMake (
+        G.config.pathToTreeTemplate,
+        processTemplate,
+        defTemplateFileCreated,
+        defTemplateText
+    );
+
+
+    function defTemplateFileCreated (path, content) {
+
+        LOG (`created file for Tree-view Template: ${path}. You may edit it manually.`);
+        processTemplate (content);
+    }
+    function processTemplate (template) {
+        G.view.treeParser = new PARSER (template);
     }
 }
 function openTextEditor() {  //return FLOW.done('finish'); 
@@ -272,9 +298,10 @@ function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
     const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
-    let command = interface.command.split ('\n')[0];
+    let commandLine = interface.command.split ('\n')[0];
+    let command = commandLine.split (' ')[0];
+    let commandArgs = commandLine.split (' ').slice(1);
     let msg = '';
-
 
     const commandsList = {
         '': command_empty,
@@ -284,6 +311,7 @@ function executeCommands(interface) {
         'del': command_delete,
         'clr': command_clear,
         'tree': command_tree,
+        'switch': command_switchBase,
         'exit': command_exit,
     };
     const m = {
@@ -301,7 +329,7 @@ function executeCommands(interface) {
 
     LOG ('trying to execute command: '+ command);
     try {
-        commandsList[command]();
+        commandsList[command](commandArgs);
     } catch (e) {
         msg = m.wrongCommand;
         ERR (m.wrongCommand);
@@ -387,11 +415,20 @@ function executeCommands(interface) {
     }
 
     // TESTING
+    function command_switchBase (params) {
+        if (params && params[0]) {
+            let alias = params[0];
+            let config = G.config;
+            msg = `BASE IS SWITCHED TO \n"${alias}"`;
+            command = 'add';
+        } else {
+            msg = "WHAT A BASE TO SWITCH TO?";
+        }
+    }
     function command_tree() {
         const time = UTIL.clock();
-        const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
-        const treeString = treeParser.stringify (UTIL.treeView (base));
-
+        const treeString = G.view.treeParser.stringify (UTIL.treeView (base));
+        
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         command = 'clr';
@@ -454,20 +491,7 @@ function closeApp(param) {
 
 
 function test(param) {
-    command_tree()
-    process.exit ();
-
-
-
-    function command_tree() {
-        const time = UTIL.clock();
-        const treeParser = new PARSER ('<><name>\n<m><text>\n\n\n');
-        const treeString = treeParser.stringify (UTIL.treeView (G.base.data));
-
-        interface.text = treeString;
-        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
-        command = 'clr';
-    }
+    //process.exit ();
 }
 
 
