@@ -91,7 +91,7 @@ If you specified a name for your note, you will be able to edit it later.
 6. `clr` -- clear all fields of the Interface
 7. `last` -- load the tast record
 8. `tree` -- shows the base in a tree-view format (experimental)
-9. `switch` -- choose another base to work with
+9. `load` -- load/reload base to work with (example: "load js")
 10. `exit` -- close the program
 
 .

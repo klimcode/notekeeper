@@ -123,7 +123,7 @@ module.exports = {
                 tree.push ({
                     name: child.name,
                     text: child.text,
-                    $indent: child.level,
+                    modifier: child.level,
                 });
 
                 makeTree (child, base, tree);

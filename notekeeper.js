@@ -42,7 +42,7 @@ FLOW.steps = {
     'user added/edited a record': updateBaseFile,
     'base file is updated': nope,
     'user wants to load another base': switchBase,
-    'config is ready for another base loading': getBase,
+    'notekeeper is prepared for base loading': getBase,
     'config file is updated': nope,
     
     // other
@@ -69,6 +69,7 @@ function getConfig(dir) { // TODO: separate CLI and Config file creation
         pathToInterfaceTemplate: PATH.join( dir, 'template_interface.txt' ),
         pathToTreeTemplate:     PATH.join( dir, 'template_tree.txt' ),
         editor: 'subl',
+        bases: [{ alias: "first", path: "base.txt" }],
     };
     const CLIQuestions = [
         { prop: 'pathToBase', question: 'New config-file will be created. Please, answer on 3 questions. \nFull path to database file (with filename):' },
@@ -338,7 +339,7 @@ function executeCommands(interface) {
         'clr': command_clear,
         'last': command_lastRecord,
         'tree': command_tree,
-        'switch': command_switchBase,
+        'load': command_loadBase,
         'exit': command_exit,
     };
     const m = {
@@ -449,7 +450,7 @@ function executeCommands(interface) {
         msg = `THE LAST RECORD IS LOADED`;
         commandLine = 'edit';
     }
-    function command_switchBase(params) {
+    function command_loadBase(params) {
         if (params && params[0]) {
             const alias = params[0];
             let config = G.config;
@@ -470,16 +471,27 @@ function executeCommands(interface) {
                 }
             }
         } else {
-            msg = "WHAT A BASE TO SWITCH TO?";
+            commandLine = 'add';
+            msg = "THE BASE IS RELOADED";
+            FLOW.done('notekeeper is prepared for base loading');
         }
     }
     function command_tree() {
         const time = UTIL.clock();
-        const treeString = G.view.treeParser.stringify (UTIL.treeView (base));
+        const treeString = G.view.treeParser.stringify (UTIL.treeView (base), indent);
         
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         commandLine = 'clr';
+
+        
+        function indent (string, tabwidth) {
+            let padding = Array (tabwidth).join ('  ');
+            return string
+                .split ('\n')
+                .map ((line, i) => padding + ( i>0 ? '  ' : '' ) + line) // additional padding for non-first lines
+                .join ('\n') + '\n';
+        }
     }
 
 
@@ -520,7 +532,7 @@ function switchBase(newConfig) { // Mutates a Config File !
         JSON.stringify (newConfig, null, 2),
         () => FLOW.done ('config file is updated')
     );
-    FLOW.done('config is ready for another base loading');
+    FLOW.done('notekeeper is prepared for base loading');
 }
 
 
