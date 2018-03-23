@@ -10,7 +10,7 @@ This is a simple Node.js utility for making notes.
 
 **Installation**: `sudo npm i -g notekeeper`
 
-On the first run Notekeeper creates a folder `notekeeper` in your Home Directory containing next files:
+On the first run Notekeeper creates in your Home Directory a folder `notekeeper` containing next files:
 
 1. `config.json` stores paths and settings
 2. `template_base.txt` stores a markup for database records'
@@ -19,9 +19,9 @@ On the first run Notekeeper creates a folder `notekeeper` in your Home Directory
 
 Then Notekeeper will ask 3 questions:
 
-1. a **path for Database** file for storing Notes,
-2. a **path for Interface** file -- a temp file that will be opened in your text editor,
-3. a **shell command** which opens your Text Editor.
+1. a **path for a Database** file for storing Notes,
+2. a **path for a Interface** file -- a temp file that will be opened in your text editor,
+3. a **shell command** which can open your Text Editor.
 
 It's ok to skip all answers to use default settings (`base.txt`, `new_note.txt`, `subl`).
 
@@ -31,8 +31,8 @@ It's ok to skip all answers to use default settings (`base.txt`, `new_note.txt`,
 
 ## Text Editors
 
-Notekeeper was well tested with **Sublime Text 3**, **Atom**, **VS CODE** on Linux.
-It should work with any text editor which can be executed by a shell command `<editr> <filepath>`.
+Notekeeper was well tested with **Sublime Text 3**, **Atom**, **VS Code** on Linux.
+It should work with any text editor which can be executed by a shell command `<editor> <filepath>`.
 Your text editor must support hot reloading of externally edited files.
 
 .
@@ -42,9 +42,8 @@ Your text editor must support hot reloading of externally edited files.
 1. At the startup, Notekeeper parses the Database file trying to find already Used Tags there.
 2. The **Interface file** is opened in your Text editor and shows you Tags parsed from the base.
 3. Write or paste your note in the first line of the Interface. Your note may contain an unlimited count of lines and any symbols.
-4. Specify an optional name and tags (also optional).
-5. Save the file by pressing `ctrl+S` (`Command+S`). Notekeeper will detect the changes, parse your note and push it to the Database. If you don't want to save the current Note to the Database just leave the **Commands** field empty. If you specified a name for your note, you will be able to edit it later.
-6. Type `exit` in the **Commands** field to close Notekeeper.
+4. Specify an optional name and comma-separated tags (also optional). A tag may contain whitespaces.
+5. Save the file by pressing `ctrl+S` (`Command+S`). Notekeeper will detect the change of the Interface file, parse your note and push it to the Database. If you don't want to save the current Note to the Database just leave the **Commands** field empty. If you specify a name for your note, you will be able to edit it later.
 
 .
 
@@ -53,7 +52,7 @@ Your text editor must support hot reloading of externally edited files.
 The default interface looks like this:
 
 ```html
-
+  
 ================================== name ======================================
 
 ================================== tags ======================================
