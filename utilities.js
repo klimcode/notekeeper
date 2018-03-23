@@ -85,9 +85,11 @@ module.exports = {
 
         sortChildren (root, mainBase);
         makeTree (root, mainBase, tree);
+        clearBaseIds (mainBase);
 
         
         return tree;
+
 
         function getParentsIds (parents, base) {
             let len = parents.length;
@@ -138,6 +140,12 @@ module.exports = {
                 });
 
                 makeTree (child, base, tree);
+            });
+        }
+        function clearBaseIds (base) {
+            base.forEach (record => {
+                record._parentsIds = undefined;
+                record._childrenIds = undefined;
             });
         }
     },
