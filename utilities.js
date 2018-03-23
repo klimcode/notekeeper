@@ -83,6 +83,7 @@ module.exports = {
             setChild (record, mainBase, root);  // register the record in each parent's record as a child
         });
 
+        sortChildren (root, mainBase);
         makeTree (root, mainBase, tree);
 
         
@@ -110,6 +111,16 @@ module.exports = {
                 if (!parent._childrenIds) parent._childrenIds = [record._id];
                 else parent._childrenIds.push (record._id);
             }
+        }
+        function sortChildren (root, base) {
+            let children = root._childrenIds;
+            if (!children) return;
+
+            children.sort((a,b) => base[a].name > base[b].name ? 1 : -1)
+
+            children.forEach (childId => {                
+                sortChildren (base[childId], base);
+            });
         }
         function makeTree (root, base, tree) {
             if (!root._childrenIds) return;
