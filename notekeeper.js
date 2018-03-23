@@ -16,9 +16,10 @@
         base: {},
         view: {},
     };
-    const FLOW = new Flow(G.flowSettings);
-
-
+    G.pathToConfig = PATH.join( G.homedir, 'config.json' );
+    
+    
+const FLOW = new Flow(G.flowSettings);
 FLOW.steps = {
     // startup steps
     'start': makeHomedir,
@@ -31,10 +32,14 @@ FLOW.steps = {
     'interface is ready to use': [ openTextEditor, detectInterfaceChanges ],
 
     // change detection and commands execution
-    'interface is changed': [ executeCommands, test ],
-    'interface is refreshed': renderInterface,
-    'baseFile is updated': nope,
+    'user entered something': [ executeCommands, test ],
+    'new data to display for user': renderInterface,
     'interface is restored': renderInterface,
+    'user wants to load other base': getBase,
+    'user added/edited a record': updateBaseFile,
+    'base file is updated': nope,
+    'new config is ready to be written in file': updateConfigFile,
+    'config file is updated': nope,
 
     // messaging
     'interface is broken': showErrorMessage,
@@ -54,7 +59,6 @@ function makeHomedir() {
     );
 }
 function getConfig(dir) { // TODO: separate CLI and Config file creation
-    const pathToConfig = PATH.join( dir, 'config.json' );
     const defaultValues = {
         pathToBase:             PATH.join( dir, 'base.txt' ),
         pathToBaseTemplate:     PATH.join( dir, 'template_base.txt' ),
@@ -70,9 +74,9 @@ function getConfig(dir) { // TODO: separate CLI and Config file creation
     ];
 
 
-    LOG (`trying to read config: ${pathToConfig}`);
+    LOG (`trying to read config: ${G.pathToConfig}`);
     FILE.getConfig (
-        pathToConfig,
+        G.pathToConfig,
         postprocessConfig,
         defaultValues,
         CLIQuestions
@@ -262,7 +266,7 @@ function detectInterfaceChanges() {
             interface.tags = UTIL.prettifyList (interface.tags);
             G.view.data = interface;
 
-            FLOW.done('interface is changed', interface);
+            FLOW.done('user entered something', interface);
         }
     }
 }
@@ -310,8 +314,10 @@ function executeCommands(interface) {
         'edit': command_edit,
         'del': command_delete,
         'clr': command_clear,
+        'last': command_lastRecord,
         'tree': command_tree,
         'switch': command_switchBase,
+        'reload': command_reloadBase,
         'exit': command_exit,
     };
     const m = {
@@ -335,29 +341,26 @@ function executeCommands(interface) {
         ERR (m.wrongCommand);
         console.log(e);
     }
-    interface.command = command + (msg? '\n'+ msg : '');
-    FLOW.done ('interface is refreshed', interface);
+    interface.command = commandLine + (msg ? "\n" + msg : "");
+    FLOW.done("new data to display for user", interface);
 
 
 
 
     function command_empty() {
-
-        LOG ('nothing :)\n');
+        // LOG ('nothing :)\n');
     }
     function command_clear() {
         interface.text = '';
         interface.name = '';
         interface.tags = '';
-        command = 'add';
+        commandLine = 'add';
     }
     function command_exit() {
-
         FLOW.done ('finish', 'Tot ziens!\n');
     }
 
     function command_add() {
-
         if (duplicateIndex == -1) { // There are no Records in the Base with the same name as a New Note has
 
             if (!interface.text) {
@@ -369,11 +372,11 @@ function executeCommands(interface) {
                     msg = m.newNamed;
                 }
                 pushNewRecordToBase ();
-                updateBaseFile ();
+                updateBaseFile();
             }
         } else { // The base has already had a record with the same name as a New Note has
             msg = m.existsMix;
-            command = 'mix';
+            commandLine = 'mix';
         }
     }
     function command_mix() {
@@ -381,10 +384,10 @@ function executeCommands(interface) {
 
         if (duplicateIndex == -1) {
             msg = m.addNew;
-            command = 'add';
+            commandLine = 'add';
         } else {
             msg = m.mixed;
-            command = 'edit';
+            commandLine = 'edit';
             concatRecords (duplicateIndex); // Shows a Record combined from New Note and existing one. Does not change the Base.
         }
     }
@@ -393,12 +396,12 @@ function executeCommands(interface) {
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
-            command = 'add';
+            commandLine = 'add';
         } else { // The base has already had a record with the same name as a New Note has
             msg = m.edited;
             deleteBaseRecord (duplicateIndex);
             pushNewRecordToBase ();
-            updateBaseFile ();
+            updateBaseFile();
         }
     }
     function command_delete() {
@@ -406,24 +409,53 @@ function executeCommands(interface) {
 
         if (duplicateIndex == -1) { // There are no duplicates in the Base
             msg = m.addNew;
-            command = 'add';
+            commandLine = 'add';
         } else { // The base has already had a record with the same name as a New Note has
             msg = m.deleted;
             deleteBaseRecord (duplicateIndex);
-            updateBaseFile ();
+            updateBaseFile();
         }
     }
 
     // TESTING
-    function command_switchBase (params) {
+    function command_lastRecord() {
+        const record = base[base.length-1];
+
+        interface.text = record.text;
+        interface.name = record.name;
+        interface.tags = record.tags;
+
+        msg = `THE LAST RECORD IS LOADED`;
+        commandLine = 'edit';
+    }
+    function command_switchBase(params) {
         if (params && params[0]) {
-            let alias = params[0];
+            const alias = params[0];
             let config = G.config;
-            msg = `BASE IS SWITCHED TO \n"${alias}"`;
-            command = 'add';
+            let baseIndex = config.bases.findIndex(b => b.alias === alias);
+            
+            if (baseIndex === -1) {
+                msg = `BASE "${alias}" \nIS NOT FOUND`;
+            } else {
+                if (baseIndex === 0) {
+                    msg = `BASE "${alias}" \nIS USED RIGHT NOW`;
+                } else {
+                    UTIL.swap(config.bases, 0, baseIndex);
+                    config.pathToBase = config.bases[0].path;
+                    
+                    msg = `BASE IS SWITCHED TO \n"${alias}" \nRELOAD BASE?`;
+                    commandLine = 'reload';
+                    FLOW.done('new config is ready to be written in file', config);
+                }
+            }
         } else {
             msg = "WHAT A BASE TO SWITCH TO?";
         }
+    }
+    function command_reloadBase() {
+        msg = `A BASE ${G.config.bases[0].alias} \nIS LOADED`;
+        commandLine = 'add';
+        FLOW.done('user wants to load other base');
     }
     function command_tree() {
         const time = UTIL.clock();
@@ -431,38 +463,47 @@ function executeCommands(interface) {
         
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
-        command = 'clr';
+        commandLine = 'clr';
     }
 
 
 
     // Utility functions
-        function pushNewRecordToBase () {
-
-            G.base.data.push ( baseParser.filterObject (interface) );
-        }
         function concatRecords (index) { // Mutates New Note in the Interface
             let baseRecord = base[index];
 
             interface.tags = UTIL.concatUniqTags (baseRecord.tags, interface.tags);
             interface.text = UTIL.concatUniqText (baseRecord.text, interface.text);
         }
+        function pushNewRecordToBase () {
+            G.base.data.push ( baseParser.filterObject (interface) );
+        }
         function deleteBaseRecord (index) {
-
             base.splice (index, 1);
         }
         function updateBaseFile () { // Mutates Base File !
-            if (G.emptyBase) {
-                G.emptyBase = false;
-                base.shift();
-            }
-            // console.log(baseParser.stringify (base));
-            FILE.write (
-                G.config.pathToBase,
-                baseParser.stringify (base),
-                () => FLOW.done ('baseFile is updated')
-            );
+            FLOW.done('user added/edited a record');
         }
+}
+function updateBaseFile() { // Mutates a Base File !
+    const base = G.base.data;
+    if (G.emptyBase) {
+        G.emptyBase = false;
+        base.shift();
+    }
+    // console.log(G.base.parser.stringify (base));
+    FILE.write (
+        G.config.pathToBase,
+        G.base.parser.stringify (base),
+        () => FLOW.done ('base file is updated')
+    );
+}
+function updateConfigFile(newConfig) { // Mutates a Config File !
+    FILE.write(
+        G.pathToConfig,
+        JSON.stringify (newConfig, null, 2),
+        () => FLOW.done ('config file is updated')
+    );
 }
 function showErrorMessage(message) {
     const restore = G.view.needRestoration;

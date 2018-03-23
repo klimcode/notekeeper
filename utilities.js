@@ -29,6 +29,12 @@ module.exports = {
         var end = process.hrtime(start);
         return Math.round((end[0]*1000) + (end[1]/1000000));
     },
+    swap (arr, a, b) {
+        let temp = arr[a];
+        arr[a] = arr[b];
+        arr[b] = temp;
+        return arr;
+    },
 
     //===================================================================================================
     //      THESE FUNCTIONS DEPEND ON A CURRENT NOTEKEEPER REALISATION
