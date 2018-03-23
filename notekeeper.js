@@ -6,13 +6,14 @@
     const FILE = require('fs-handy-wraps');
     const PARSER = require('parser-template');
     const UTIL = require('./utilities');
+    const {LOG, ERR} = require('./utilities');
 
     global.G = {
         firstStart: false,
         homedir: PATH.join (require('os').homedir(), 'notekeeper'),
         isStartup: true,
         isLogging: true,
-        flowSettings: {isLogging: true},
+        flowSettings: {isLogging: false},
         base: {},
         view: {},
     };
@@ -31,18 +32,20 @@ FLOW.steps = {
     'interface is prepared': renderInterface,
     'interface is ready to use': [ openTextEditor, detectInterfaceChanges ],
 
-    // change detection and commands execution
-    'user entered something': [ executeCommands, test ],
+    // change detection and interface's health
     'new data to display for user': renderInterface,
-    'interface is restored': renderInterface,
-    'user wants to load other base': getBase,
+    'interface is broken': showErrorMessage,
+    'interface is restored by force': renderInterface,
+    'user entered something': [ executeCommands, test ],
+
+    // base/config modifications
     'user added/edited a record': updateBaseFile,
     'base file is updated': nope,
-    'new config is ready to be written in file': updateConfigFile,
+    'user wants to load another base': switchBase,
+    'config is ready for another base loading': getBase,
     'config file is updated': nope,
-
-    // messaging
-    'interface is broken': showErrorMessage,
+    
+    // other
     'fatal error': closeApp,
     'finish': closeApp,
 };
@@ -74,7 +77,7 @@ function getConfig(dir) { // TODO: separate CLI and Config file creation
     ];
 
 
-    LOG (`trying to read config: ${G.pathToConfig}`);
+    LOG (`trying to read Config: ${G.pathToConfig}`);
     FILE.getConfig (
         G.pathToConfig,
         postprocessConfig,
@@ -89,7 +92,7 @@ function getConfig(dir) { // TODO: separate CLI and Config file creation
     }
 }
 function getBase() {
-    LOG (`trying to read database: ${G.config.pathToBase}`);
+    LOG (`trying to read Database: ${G.config.pathToBase}`);
     FILE.readOrMake(
         G.config.pathToBase,
         storeBaseContent,
@@ -114,7 +117,7 @@ function getBaseTemplate() {
     '==============================================================================\n';
 
 
-    LOG (`trying to read Template for Database parsing: ${G.config.pathToBaseTemplate}`);
+    LOG (`trying to read Template for Database: ${G.config.pathToBaseTemplate}`);
     FILE.readOrMake (
         G.config.pathToBaseTemplate,
         processTemplate,
@@ -168,7 +171,7 @@ function getInterfaceTemplate() {
     '<>any tag<tags_used>\n';
 
 
-    LOG (`trying to read interface template from file: ${G.config.pathToInterfaceTemplate}`);
+    LOG (`trying to read Template for Interface: ${G.config.pathToInterfaceTemplate}`);
     FILE.readOrMake (
         G.config.pathToInterfaceTemplate,
         processTemplate,
@@ -186,6 +189,7 @@ function getInterfaceTemplate() {
         let interfaceParser = new PARSER (template);
         G.view.parser = interfaceParser;
         G.view.data = interfaceParser.parse (template)[0];
+        G.view.defData = G.view.data;
 
         FLOW.done('interface is prepared', template);
     }
@@ -197,7 +201,7 @@ function getTreeTemplate() {
     '~~~\n';
 
 
-    LOG (`trying to read tree template from file: ${G.config.pathToTreeTemplate}`);
+    LOG (`trying to read Template for Tree-view: ${G.config.pathToTreeTemplate}`);
     FILE.readOrMake (
         G.config.pathToTreeTemplate,
         processTemplate,
@@ -218,24 +222,19 @@ function getTreeTemplate() {
 function openTextEditor() {  //return FLOW.done('finish'); 
     if (G.view.isEditorOpened) return;
 
-
     const config = G.config;
     const shellCommand = `${config.editor} ${config.pathToInterface}`;
-    LOG (`trying to open Text Editor by command: ${shellCommand}`);
+    LOG (`opening Text Editor by command: ${shellCommand}`);
 
     // An example of working shell command for Windows CMD:
     // shellCommand = 'start "" "c:\\Program Files\\Sublime Text 3\\sublime_text.exe"';
 
-
     require ('child_process').exec (shellCommand, callback);
-
     function callback (error, stdout, stderr) {
         error && console.error ('error: ', error);
         stdout && console.error ('stdout: ', stdout);
         stderr && console.error ('stderr: ', stderr);
     }
-
-
     G.view.isEditorOpened = true;
 }
 function detectInterfaceChanges() {
@@ -282,22 +281,45 @@ function renderInterface() {
 
     let tagsUsed = UTIL.getUsedTags (base);
     if (tagsUsed.length) interface.tags_used = tagsUsed;
+    else interface.tags_used = G.view.defData.tags_used;
 
 
     let interfaceText = G.view.parser.stringify (interface); // Rendering text interface
 
     if (!G.isStartup) G.view.dontRead = true; // prevent reading of InterfaceFile
-    G.view.needRestoration = false; // Interface is restored
     FILE.write(
         pathToInterface,
         interfaceText,
         () => G.isStartup && FLOW.done ('interface is ready to use') // this is performed only once till the startup
     );
 }
+function showErrorMessage(message) {
+    const forcedRestoration = G.view.needsRestoration; // it's false on the first appear
+    let mesBroken = 
+        '\n\n                    INTERFACE IS BROKEN !\n'+
+        'PLEASE, FIX IT MANUALLY OR IT WILL BE RESTORED WITH POSSIBLE DATA LOSS';
+    let msg = message || mesBroken;
+    
+    
+    if (forcedRestoration) {
+        message = '';
+        G.view.needsRestoration = false;
+    } else {
+        ERR (msg);
+        G.view.needsRestoration = true;
+    }
+    
+    G.view.dontRead = true;
+    FILE.append (
+        G.config.pathToInterface,
+        msg,
+        () => forcedRestoration && FLOW.done ('interface is restored by force') // rendering of restored interface
+    );
+}
 
 
 // ACTIONS
-function nope() {/*nothing*/}
+function nope() {/*do nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
@@ -317,7 +339,6 @@ function executeCommands(interface) {
         'last': command_lastRecord,
         'tree': command_tree,
         'switch': command_switchBase,
-        'reload': command_reloadBase,
         'exit': command_exit,
     };
     const m = {
@@ -333,7 +354,7 @@ function executeCommands(interface) {
     };
 
 
-    LOG ('trying to execute command: '+ command);
+    LOG ('executing command: '+ command);
     try {
         commandsList[command](commandArgs);
     } catch (e) {
@@ -417,7 +438,7 @@ function executeCommands(interface) {
         }
     }
 
-    // TESTING
+    // UNSTABLE
     function command_lastRecord() {
         const record = base[base.length-1];
 
@@ -442,20 +463,15 @@ function executeCommands(interface) {
                 } else {
                     UTIL.swap(config.bases, 0, baseIndex);
                     config.pathToBase = config.bases[0].path;
-                    
-                    msg = `BASE IS SWITCHED TO \n"${alias}" \nRELOAD BASE?`;
-                    commandLine = 'reload';
-                    FLOW.done('new config is ready to be written in file', config);
+
+                    commandLine = 'add';
+                    msg = `BASE IS SWITCHED TO \n"${alias}"`;
+                    FLOW.done('user wants to load another base', config);
                 }
             }
         } else {
             msg = "WHAT A BASE TO SWITCH TO?";
         }
-    }
-    function command_reloadBase() {
-        msg = `A BASE ${G.config.bases[0].alias} \nIS LOADED`;
-        commandLine = 'add';
-        FLOW.done('user wants to load other base');
     }
     function command_tree() {
         const time = UTIL.clock();
@@ -498,48 +514,20 @@ function updateBaseFile() { // Mutates a Base File !
         () => FLOW.done ('base file is updated')
     );
 }
-function updateConfigFile(newConfig) { // Mutates a Config File !
+function switchBase(newConfig) { // Mutates a Config File !
     FILE.write(
         G.pathToConfig,
         JSON.stringify (newConfig, null, 2),
         () => FLOW.done ('config file is updated')
     );
+    FLOW.done('config is ready for another base loading');
 }
-function showErrorMessage(message) {
-    const restore = G.view.needRestoration;
-    let mesBroken = 
-        '\n\n                    INTERFACE IS BROKEN !\n'+
-        'PLEASE, FIX IT MANUALLY OR IT WILL BE RESTORED WITH POSSIBLE DATA LOOSING';
-    if (G.view.needRestoration) mesBroken = '';
-    let msg = message || mesBroken;
 
 
-    G.view.needRestoration = true;
-    G.view.dontRead = true;
-    ERR (msg);
-
-
-    FILE.append (
-        G.config.pathToInterface,
-        msg,
-        () => restore && FLOW.done ('interface is restored')
-    );
-}
 function closeApp(param) {
     LOG (param);
     process.exit ();
 }
-
-
 function test(param) {
     //process.exit ();
 }
-
-
-// CONSOLE LOGGING
-    function LOG (msg) {
-        G.isLogging && console.log ('\x1b[2m%s\x1b[0m', msg);
-    }
-    function ERR (msg) {
-        console.log ('\x1b[31m%s\x1b[0m', msg);
-    }

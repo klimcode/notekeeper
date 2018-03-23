@@ -1,11 +1,10 @@
 # Notekeeper
 
+This is a simple Node.js utility for making notes.
 
-This is a simple Node.js utility for making notes. 
-
-1. type `notekeeper` in your command line (I prefer just "note" as alias) 
-2. the Note Interface will be automatically opened in your preferred Text Editor 
-3. write something, save the file and it's done: your new note is appended to the database plain text file 
+1. type `notekeeper` in your command line (I prefer just "note" as alias)
+2. the Note Interface will be automatically opened in your preferred Text Editor
+3. write something, save the file and it's done: your new note is appended to the database plain text file
 
 ----
 
@@ -90,8 +89,10 @@ If you specified a name for your note, you will be able to edit it later.
 4. `edit` -- edit a record specified by a name in the base
 5. `del` -- delete a record specified by a name from the base
 6. `clr` -- clear all fields of the Interface
-7. `tree` -- shows the base in a tree-view format (experimental)
-8. `exit` -- close the program
+7. `last` -- load the tast record
+8. `tree` -- shows the base in a tree-view format (experimental)
+9. `switch` -- choose another base to work with
+10. `exit` -- close the program
 
 .
 

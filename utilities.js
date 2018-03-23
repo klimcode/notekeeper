@@ -69,7 +69,6 @@ module.exports = {
             -1;     // empty name equals to uniq name
     },
 
-
     // TREE VIEW
     treeView (mainBase) {
         const isEqual = this.isEqual;
@@ -132,33 +131,11 @@ module.exports = {
         }
     },
 
-    /* Future purposes
-    function parseTabulation(argument) {
-        const arr = [];
-        let spaces = 0;
-        let line = '';
-        for (let i = 0; i < base.length; i++) {
-            let char = base[i];
-
-            if (char === '\n') {        // End of a line
-                arr.push({'spaces': spaces, 'line': line});
-
-                line = '';
-                spaces = 0;
-            } else {
-                if (!line) {
-                    if (char === ' ') {     // somewhere inside a Tabulation
-                        spaces++;
-                    } else {
-                        line += char;       // Start of a line
-                    }
-                } else {                    // somewhere inside a line
-                    line += char;
-                }
-            }
-        }
-        arr.push({'spaces': spaces, 'line': line});     // The last line
-        console.log(arr);
-    }
-    */
+    // CONSOLE
+    LOG (msg) {
+        G.isLogging && console.log ('\x1b[2m%s\x1b[0m', msg);
+    },
+    ERR (msg) {
+        console.log ('\x1b[31m%s\x1b[0m', msg);
+    },
 }
