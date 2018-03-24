@@ -336,6 +336,7 @@ function executeCommands(interface) {
         'mix': command_mix,
         'edit': command_edit,
         'del': command_delete,
+        'ren': command_rename,
         'clr': command_clear,
         'last': command_lastRecord,
         'tree': command_tree,
@@ -440,6 +441,12 @@ function executeCommands(interface) {
     }
 
     // UNSTABLE
+    function command_rename(args) {
+        if (!args || !args[0]) {
+            msg = `WHAT A NEW NAME FOR THIS RECORD?`;
+            return;
+        }
+    }
     function command_lastRecord() {
         const record = base[base.length-1];
 
@@ -450,9 +457,9 @@ function executeCommands(interface) {
         msg = `THE LAST RECORD IS LOADED`;
         commandLine = 'edit';
     }
-    function command_loadBase(params) {
-        if (params && params[0]) {
-            const alias = params[0];
+    function command_loadBase(args) {
+        if (args && args[0]) {
+            const alias = args[0];
             let config = G.config;
             let baseIndex = config.bases.findIndex(b => b.alias === alias);
             
