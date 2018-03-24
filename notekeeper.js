@@ -442,10 +442,29 @@ function executeCommands(interface) {
 
     // UNSTABLE
     function command_rename(args) {
+        const oldName = interface.name;
+        if (!oldName) {
+            msg = `WHAT RECORD MUST BE RENAMED?`;
+            return;
+        }
+        const recordId = UTIL.searchDuplicate (base, oldName);
+        if (recordId === -1) {
+            msg = `A RECORD NAMED "${oldName}" IS NOT FOUND`;
+            return;
+        }
         if (!args || !args[0]) {
             msg = `WHAT A NEW NAME FOR THIS RECORD?`;
             return;
         }
+        const newName = args[0];
+        if (UTIL.searchDuplicate (base, newName) !== -1) {
+            msg = `A NAME "${newName}" IS ALREADY USED`;
+            return;
+        }
+        
+        // The Functional will be added later
+        msg = `SORRY, THIS FUNCTION IS NOT READY YET`;
+        // msg = `RECORD "${oldName}" IS RENAMED TO "${newName}"`;
     }
     function command_lastRecord() {
         const record = base[base.length-1];
@@ -487,7 +506,7 @@ function executeCommands(interface) {
         const time = UTIL.clock();
         const rootId = args[0] ? UTIL.searchDuplicate (base, args[0]) : null;
         if (rootId === -1) {
-            msg = `RECORD "${root} IS NOT FOUND"`;
+            msg = `RECORD "${rootId}" IS NOT FOUND`;
             return;
         }
 
