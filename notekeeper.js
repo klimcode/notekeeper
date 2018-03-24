@@ -476,10 +476,15 @@ function executeCommands(interface) {
             FLOW.done('notekeeper is prepared for base loading');
         }
     }
-    function command_tree() {
+    function command_tree(args) {
         const time = UTIL.clock();
-        const treeString = G.view.treeParser.stringify (UTIL.treeView (base), indent);
-        
+        const rootId = args[0] ? UTIL.searchDuplicate (base, args[0]) : null;
+        if (rootId === -1) {
+            msg = `RECORD "${root} IS NOT FOUND"`;
+            return;
+        }
+
+        const treeString = G.view.treeParser.stringify (UTIL.treeView (base, rootId), indent);
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         commandLine = 'clr';

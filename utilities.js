@@ -1,6 +1,5 @@
 module.exports = {
     removeDuplicates (arr) {
-
         return arr.filter ((el, pos, a) => (a.indexOf(el) == pos) && el );
     },
     getRegexCaptures (content, regex, callback) {
@@ -70,21 +69,22 @@ module.exports = {
     },
 
     // TREE VIEW
-    treeView (mainBase) {
+    treeView (mainBase, rootId) {
         const isEqual = this.isEqual;
         let tree = [];  
-        let root = { _childrenIds: [] };
+        let rootRecord = { _childrenIds: [] };
+        let specifiedRoot = rootId===null ? rootRecord : mainBase[rootId];
 
 
         mainBase.forEach ((record, i) => { // set IDs, parents and children
             if (!record.text.trim()) return; // jump over empty records
             record._id = i;
             record._parentsIds = getParentsIds (record.tags, mainBase);  // find Ids of all parents (tags)
-            setChild (record, mainBase, root);  // register the record in each parent's record as a child
+            setChild (record, mainBase, rootRecord);  // register the record in each parent's record as a child
         });
 
-        sortChildren (root, mainBase);
-        makeTree (root, mainBase, tree);
+        sortChildren (specifiedRoot, mainBase);
+        makeTree (specifiedRoot, mainBase, tree);
         clearBaseIds (mainBase);
 
         
@@ -93,7 +93,7 @@ module.exports = {
 
         function getParentsIds (parents, base) {
             let len = parents.length;
-            if (!len || !parents[0]) return ['root'];
+            if (!len || !parents[0]) return ['rootRecord'];
 
             let parentIds = Array (len);
             for (let i=0; i<len; i++) {
@@ -101,21 +101,21 @@ module.exports = {
                 let id = base.findIndex (e => isEqual (e.name, tag));
 
                 if (id !== -1) parentIds[i] = id;
-                else parentIds[i] = 'root'; 
+                else parentIds[i] = 'rootRecord'; 
             };
             return parentIds;
         }
-        function setChild (record, base, root) {
+        function setChild (record, base, rootRecord) {
             let parents = record._parentsIds;
             for (let i=0; i<parents.length; i++) {
                 let parentId = parents[i];
-                let parent = parentId === 'root' ? root : base[parentId];
+                let parent = parentId === 'rootRecord' ? rootRecord : base[parentId];
                 if (!parent._childrenIds) parent._childrenIds = [record._id];
                 else parent._childrenIds.push (record._id);
             }
         }
-        function sortChildren (root, base) {
-            let children = root._childrenIds;
+        function sortChildren (specifiedRoot, base) {
+            let children = specifiedRoot._childrenIds;
             if (!children) return;
 
             children.sort((a,b) => base[a].name > base[b].name ? 1 : -1)
@@ -124,12 +124,21 @@ module.exports = {
                 sortChildren (base[childId], base);
             });
         }
-        function makeTree (root, base, tree) {
-            if (!root._childrenIds) return;
+        function makeTree (specifiedRoot, base, tree) {
+            let level = 0;
+            if (specifiedRoot.level) level = specifiedRoot.level; // recursion level
+            else if (specifiedRoot._id) { // this record is not a global Root. It will be shown.
+                level = 1;
+                tree.push ({
+                    name: specifiedRoot.name,
+                    text: specifiedRoot.text,
+                    modifier: 1,
+                });
+            }
+            
+            if (!specifiedRoot._childrenIds) return tree;
 
-            let level = root.level || 0;
-
-            root._childrenIds.forEach (childId => {
+            specifiedRoot._childrenIds.forEach (childId => { // getting levels of children
                 let child = base[childId];
                 child.level = level + 1;
 
