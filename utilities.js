@@ -74,6 +74,7 @@ module.exports = {
         let tree = [];  
         let rootRecord = { _childrenIds: [] };
         let specifiedRoot = rootId===null ? rootRecord : mainBase[rootId];
+        let isLoop = false;
 
 
         mainBase.forEach ((record, i) => { // set IDs, parents and children
@@ -83,6 +84,7 @@ module.exports = {
             setChild (record, mainBase, rootRecord);  // register the record in each parent's record as a child
         });
 
+        setLevels (specifiedRoot, mainBase);
         sortChildren (specifiedRoot, mainBase);
         makeTree (specifiedRoot, mainBase, tree);
         clearBaseIds (mainBase);
@@ -114,7 +116,45 @@ module.exports = {
                 else parent._childrenIds.push (record._id);
             }
         }
+        function setLevels (specifiedRoot, base) {
+            if (isLoop) return;
+
+            let level = specifiedRoot.level || 0;
+            if (!specifiedRoot.level && specifiedRoot._id >= 0) { // not a global Root. It will be shown.
+                level = 1;
+            }
+            if (!specifiedRoot._childrenIds) return tree; // exit from a recursion
+
+
+            if (level > 100) { // Catching a recursion Loop
+                tree.push ({name: specifiedRoot.name, parents: specifiedRoot.tags});
+            }
+            if (level > 110) {
+                if (tree.findIndex (e => e.name === specifiedRoot.name) >= 0) {
+                    isLoop = true;
+                    console.error ('LOOP!');
+
+                    const victim = tree.find (record => {
+                        return record.parents.find (parent => {
+                            const found = tree.find (e => isEqual (e.name, parent))
+                            if (!found) return true; 
+                        });
+                    });
+                    tree = `RECORD WITH ERROR: "${victim.name}"`;
+                    return;
+                }
+            }
+            
+            specifiedRoot._childrenIds.forEach (childId => { // set children levels
+                let child = base[childId];
+                child.level = level + 1;
+
+                setLevels (child, base);
+            });
+        }
         function sortChildren (specifiedRoot, base) {
+            if (isLoop) return;
+
             let children = specifiedRoot._childrenIds;
             if (!children) return;
 
@@ -125,6 +165,8 @@ module.exports = {
             });
         }
         function makeTree (specifiedRoot, base, tree) {
+            if (isLoop) return;
+
             let level = 0;
             if (specifiedRoot.level) level = specifiedRoot.level; // recursion level
             else if (specifiedRoot._id) { // this record is not a global Root. It will be shown.

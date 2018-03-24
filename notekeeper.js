@@ -509,8 +509,14 @@ function executeCommands(interface) {
             msg = `RECORD "${rootId}" IS NOT FOUND`;
             return;
         }
+        
+        const treeView = UTIL.treeView (base, rootId);
+        if (typeof treeView === 'string') {
+            msg = `ERROR IN TREE-VIEW! \n${treeView} \nCAN BE FIXED MANUALLY ONLY`;
+            return;
+        }
 
-        const treeString = G.view.treeParser.stringify (UTIL.treeView (base, rootId), indent);
+        const treeString = G.view.treeParser.stringify (treeView, indent);
         interface.text = treeString;
         msg = '"generation time: '+ UTIL.clock (time) +'ms"';
         commandLine = 'clr';
