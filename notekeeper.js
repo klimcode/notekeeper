@@ -212,7 +212,6 @@ function getTreeTemplate() {
 
 
     function defTemplateFileCreated (path, content) {
-
         LOG (`created file for Tree-view Template: ${path}. You may edit it manually.`);
         processTemplate (content);
     }
@@ -324,7 +323,6 @@ function nope() {/*do nothing*/}
 function executeCommands(interface) {
     const base = G.base.data;
     const baseParser = G.base.parser;
-    const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
     let commandLine = interface.command.split ('\n')[0];
     let command = commandLine.split (' ')[0];
     let commandArgs = commandLine.split (' ').slice(1);
@@ -334,6 +332,7 @@ function executeCommands(interface) {
         '': command_empty,
         'add': command_add,
         'mix': command_mix,
+        'get': command_getRecord,
         'edit': command_edit,
         'del': command_delete,
         'ren': command_rename,
@@ -343,29 +342,18 @@ function executeCommands(interface) {
         'load': command_loadBase,
         'exit': command_exit,
     };
-    const m = {
-        empty: `THE TEXT FIELD IS EMPTY.\nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
-        newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
-        newNamed: `NEW RECORD NAMED "${interface.name}"\nWAS PUSHED TO THE BASE.`,
-        existsMix: `A RECORD NAMED "${interface.name}"\nALREADY EXISTS.\nMIX WITH IT?`,
-        mixed: `RECORDS NAMED "${interface.name}"\nWERE MIXED.`,
-        addNew: `ADD A NEW RECORD TO THE BASE?`,
-        edited: `A RECORD NAMED "${interface.name}"\nWAS SUCCESSFULLY EDITED.`,
-        deleted: `A RECORD NAMED "${interface.name}"\nWAS DELETED.`,
-        wrongCommand: `A COMMAND "${command}" DOES NOT EXIST.`
-    };
 
 
     LOG ('executing command: '+ command);
     try {
         commandsList[command](commandArgs);
     } catch (e) {
-        msg = m.wrongCommand;
-        ERR (m.wrongCommand);
+        message ('wrongCommand', command);
+        ERR ('Error in a command '+ command);
         console.log(e);
     }
-    interface.command = commandLine + (msg ? "\n" + msg : "");
-    FLOW.done("new data to display for user", interface);
+    interface.command = commandLine + (msg ? "\n" + msg : ""); // Show messages under the command field
+    FLOW.done ("new data to display for user", interface);
 
 
 
@@ -374,151 +362,179 @@ function executeCommands(interface) {
         // LOG ('nothing :)\n');
     }
     function command_clear() {
-        interface.text = '';
-        interface.name = '';
-        interface.tags = '';
+        placeRecordToInterface ({});
         commandLine = 'add';
     }
     function command_exit() {
         FLOW.done ('finish', 'Tot ziens!\n');
     }
 
-    function command_add() {
-        if (duplicateIndex == -1) { // There are no Records in the Base with the same name as a New Note has
+    function command_add(args) {
+        const name = args[0] || interface.name;
+        const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
+
+        if (index === -1) { // the Base does not have a Record with the Name specified
+            if (args[0]) {
+                const tagsFromArgs = args.slice(1).join(' ');
+                if (tagsFromArgs) interface.tags = tagsFromArgs;
+                if (!interface.text) interface.text = '...';
+                interface.name = name;
+            }
 
             if (!interface.text) {
-                msg = m.empty;
+                message ('empty');
             } else {
                 if (!interface.name) {
-                    msg = m.newNoname;
+                    message ('newNoname');
                 } else {
-                    msg = m.newNamed;
+                    message ('newNamed', name);
                 }
                 pushNewRecordToBase ();
-                updateBaseFile();
             }
-        } else { // The base has already had a record with the same name as a New Note has
-            msg = m.existsMix;
+        } else { // the Name is already existed in the Base
+            message ('existsMix', name);
             commandLine = 'mix';
         }
     }
     function command_mix() {
-        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
+        const name = interface.name;
+        const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
-        if (duplicateIndex == -1) {
-            msg = m.addNew;
+        if (index === -1) {
+            message ('addNew');
             commandLine = 'add';
         } else {
-            msg = m.mixed;
+            message ('mixed', name);
+            concatRecords (index); // Makes a Record combined from New Note and existing one. Does not change the Base.
             commandLine = 'edit';
-            concatRecords (duplicateIndex); // Shows a Record combined from New Note and existing one. Does not change the Base.
         }
     }
-    function command_edit() {
-        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
+    function command_edit(args) {
+        const name = args[0] || interface.name;
+        const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
-        if (duplicateIndex == -1) { // There are no duplicates in the Base
-            msg = m.addNew;
+        if (index === -1) { // The Base does not have a Record with a Name specified
+            message ('addNew');
             commandLine = 'add';
-        } else { // The base has already had a record with the same name as a New Note has
-            msg = m.edited;
-            deleteBaseRecord (duplicateIndex);
+        } else { // The base has already had a record with the same name as specified
+            message ('edited', name);
+            deleteBaseRecord (index);
             pushNewRecordToBase ();
-            updateBaseFile();
         }
     }
-    function command_delete() {
-        const duplicateIndex = UTIL.searchDuplicate (base, interface.name);
+    function command_delete(args) {
+        const name = args[0] || interface.name;
+        const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
-        if (duplicateIndex == -1) { // There are no duplicates in the Base
-            msg = m.addNew;
+        if (index === -1) { // the Base does not have a Record with the Name specified
+            message ('addNew');
             commandLine = 'add';
-        } else { // The base has already had a record with the same name as a New Note has
-            msg = m.deleted;
-            deleteBaseRecord (duplicateIndex);
-            updateBaseFile();
+        } else {
+            message ('deleted', name);
+            deleteBaseRecord (index);
         }
     }
 
-    // UNSTABLE
-    function command_rename(args) {
-        const oldName = interface.name;
-        if (!oldName) {
-            msg = `WHAT RECORD MUST BE RENAMED?`;
+    function command_getRecord(args) {
+        const name = args[0] || interface.name;
+        if (!name) {
+            message ('whatToShow');
             return;
         }
-        const recordId = UTIL.searchDuplicate (base, oldName);
-        if (recordId === -1) {
-            msg = `A RECORD NAMED "${oldName}" IS NOT FOUND`;
+        const index = UTIL.searchName (base, name);
+        if (index === -1) {
+            message ('notFound', name);
             return;
         }
-        if (!args || !args[0]) {
-            msg = `WHAT A NEW NAME FOR THIS RECORD?`;
-            return;
-        }
-        const newName = args[0];
-        if (UTIL.searchDuplicate (base, newName) !== -1) {
-            msg = `A NAME "${newName}" IS ALREADY USED`;
-            return;
-        }
-        
-        // The Functional will be added later
-        msg = `SORRY, THIS FUNCTION IS NOT READY YET`;
-        // msg = `RECORD "${oldName}" IS RENAMED TO "${newName}"`;
+        const record = base[index];
+
+        placeRecordToInterface (record);
+        message ('');
+        commandLine = 'edit';
     }
     function command_lastRecord() {
         const record = base[base.length-1];
 
-        interface.text = record.text;
-        interface.name = record.name;
-        interface.tags = record.tags;
+        placeRecordToInterface (record);
 
-        msg = `THE LAST RECORD IS LOADED`;
+        message ('last');
         commandLine = 'edit';
     }
+
+    function command_rename(args) { // NOT FINISHED YET
+        const oldName = interface.name;
+        if (!oldName) {
+            message ('whatToRename');
+            return;
+        }
+        const recordId = UTIL.searchName (base, oldName);
+        if (recordId === -1) {
+            message ('notFound', oldName);
+            return;
+        }
+        if (!args || !args[0]) {
+            message ('whatNewName');
+            return;
+        }
+        const newName = args[0];
+        if (UTIL.searchName (base, newName) !== -1) {
+            message ('nameUsed', newName);
+            return;
+        }
+        
+        // It must rename a record and all links to it
+
+        
+        message ('demo');
+    }
     function command_loadBase(args) {
-        if (args && args[0]) {
+        if (args[0]) {
             const alias = args[0];
             let config = G.config;
             let baseIndex = config.bases.findIndex(b => b.alias === alias);
             
             if (baseIndex === -1) {
-                msg = `BASE "${alias}" \nIS NOT FOUND`;
+                message('baseNotFound', alias)
             } else {
                 if (baseIndex === 0) {
-                    msg = `BASE "${alias}" \nIS USED RIGHT NOW`;
+                    message('baseUsed', alias);
                 } else {
                     UTIL.swap(config.bases, 0, baseIndex);
                     config.pathToBase = config.bases[0].path;
 
                     commandLine = 'add';
-                    msg = `BASE IS SWITCHED TO \n"${alias}"`;
+                    message('baseSwitched', alias);
                     FLOW.done('user wants to load another base', config);
                 }
             }
         } else {
             commandLine = 'add';
-            msg = "THE BASE IS RELOADED";
+            message('baseReloaded');
             FLOW.done('notekeeper is prepared for base loading');
         }
     }
     function command_tree(args) {
         const time = UTIL.clock();
-        const rootId = args[0] ? UTIL.searchDuplicate (base, args[0]) : null;
+        const rootName = args[0];
+        const rootId = rootName ? UTIL.searchName (base, rootName) : null;
         if (rootId === -1) {
-            msg = `RECORD "${rootId}" IS NOT FOUND`;
+            message ('notFound', rootName);
             return;
         }
         
-        const treeView = UTIL.treeView (base, rootId);
-        if (typeof treeView === 'string') {
-            msg = `ERROR IN TREE-VIEW! \n${treeView} \nCAN BE FIXED MANUALLY ONLY`;
+        const tree = UTIL.buildTree (base, rootId);
+        if (tree.error) {
+            const victim = tree[0];
+
+            commandLine = 'edit';
+            message ('treeError', tree.error);
+            placeRecordToInterface (victim);
             return;
         }
 
-        const treeString = G.view.treeParser.stringify (treeView, indent);
+        const treeString = G.view.treeParser.stringify (tree, indent);
         interface.text = treeString;
-        msg = '"generation time: '+ UTIL.clock (time) +'ms"';
+        message ('treeTime', UTIL.clock (time));
         commandLine = 'clr';
 
         
@@ -534,20 +550,65 @@ function executeCommands(interface) {
 
 
     // Utility functions
+        function message (code, $1, $2, $3) {
+            const m = {
+                addNew: `ADD A NEW RECORD TO THE BASE?`,
+                empty: `THE TEXT FIELD IS EMPTY. \nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
+                newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
+                newNamed: `NEW RECORD NAMED "${$1}" \nWAS PUSHED TO THE BASE.`,
+                existsMix: `A RECORD NAMED "${$1}" \nALREADY EXISTS. \nMIX WITH IT?`,
+                mixed: `RECORDS NAMED "${$1}" \nWERE MIXED.`,
+                edited: `A RECORD NAMED "${$1}" \nWAS SUCCESSFULLY EDITED.`,
+                deleted: `A RECORD NAMED "${$1}" \nWAS DELETED.`,
+                wrongCommand: `A COMMAND "${$1}" DOES NOT WORK.`,
+
+                last: `THIS IS THE LATEST EDITED RECORD`,
+                whatToShow: `WHAT A NAME OF A RECORD TO SHOW?`,
+                whatToRename: `WHAT RECORD MUST BE RENAMED?`,
+                whatNewName: `WHAT A NEW NAME FOR THIS RECORD?`,
+                nameUsed: `A NAME "${$1}" IS ALREADY USED`,
+                notFound: `A RECORD NAMED "${$1}" IS NOT FOUND`,
+
+                baseNotFound: `BASE "${$1}" \nIS NOT FOUND`,
+                baseUsed: `BASE "${$1}" \nIS USED RIGHT NOW`,
+                baseSwitched: `BASE IS SWITCHED TO "${$1}"`,
+                baseReloaded: `THE BASE IS RELOADED`,
+
+                treeError: `ERROR IN TREE-VIEW! \n${$1} \nCAN BE FIXED MANUALLY`,
+                treeTime: `"Tree generation time: ${$1}ms"`,
+
+                demo: `SORRY, THIS FUNCTION WILL WORK IN FUTURE VERSIONS. \nCHECK A NEW VERSION OF NOTEKEEPER.`,
+            };
+            if (!code) {
+                msg = '';
+                return;
+            }
+            if (m[code]) {
+                msg = m[code];
+            }
+            else {
+                msg = `Message with code ${code} is not found`;
+                ERR (msg);
+            }
+        }
+        function placeRecordToInterface (record) { 
+            interface.text = record.text || '';
+            interface.name = record.name || '';
+            interface.tags = record.tags || '';
+        }
         function concatRecords (index) { // Mutates New Note in the Interface
             let baseRecord = base[index];
 
             interface.tags = UTIL.concatUniqTags (baseRecord.tags, interface.tags);
             interface.text = UTIL.concatUniqText (baseRecord.text, interface.text);
         }
-        function pushNewRecordToBase () {
+        function pushNewRecordToBase () { // TODO: move this out
             G.base.data.push ( baseParser.filterObject (interface) );
+            FLOW.done ('user added/edited a record');
         }
-        function deleteBaseRecord (index) {
+        function deleteBaseRecord (index) { // TODO: move this out
             base.splice (index, 1);
-        }
-        function updateBaseFile () { // Mutates Base File !
-            FLOW.done('user added/edited a record');
+            FLOW.done ('user added/edited a record');
         }
 }
 function updateBaseFile() { // Mutates a Base File !

@@ -2,13 +2,17 @@
 
 This is a simple Node.js utility for making notes.
 
-1. type `notekeeper` in your command line (I prefer just "note" as alias)
-2. the Note Interface will be automatically opened in your preferred Text Editor
-3. write something, save the file and it's done: your new note is appended to the database plain text file
+- You can save and manage Notes with a full power of your preferred Text Editor.
+- Notes are stored in plain text Base files which are easy to read without Notekeeper.
+- Helps you to create hierarchically structured knowledge base for storing any texts containing any symbols.
 
 ----
 
-**Installation**: `sudo npm i -g notekeeper`
+## Installation
+
+`sudo npm i -g notekeeper`
+
+> I recommend to make an alias for a command `notekeeper` which bootstraps the utility.
 
 On the first run Notekeeper creates in your Home Directory a folder `notekeeper` containing next files:
 
@@ -23,17 +27,24 @@ Then Notekeeper will ask 3 questions:
 2. a **path for a Interface** file -- a temp file that will be opened in your text editor,
 3. a **shell command** which can open your Text Editor.
 
-It's ok to skip all answers to use default settings (`base.txt`, `new_note.txt`, `subl`).
+It's ok to skip all answers to use default settings (`base.note`, `new_note.note`, `subl`).
 
 **Attention!**
 > The default shell command `subl` does not work on Windows!
 > An example of a working shell command for Windows: `start "" "c:\\Program Files\\Sublime Text 3\\sublime_text.exe"`
 
-## Text Editors
+### Text Editors
 
 Notekeeper was well tested with **Sublime Text 3**, **Atom**, **VS Code** on Linux.
 It should work with any text editor which can be executed by a shell command `<editor> <filepath>`.
 Your text editor must support hot reloading of externally edited files.
+
+### Syntax highlighting
+
+Notekeeper uses a extension `.note` for Base files and the Interface file. The syntax of these files may be highlited in your text editor:
+
+- The best choise for **Sublime Text** is `D` syntax.
+- An extension `notekeeper-syntax` specially written for **VS Code** uses JS-React syntax highlighting.
 
 .
 
@@ -80,16 +91,17 @@ The Tags parsed from Database will be shown it the last field. Their goal is to 
 
 ## List of commands
 
-1. Empty -- do nothing
+1. Empty command -- do nothing
 2. `add` -- save the current note to the base
 3. `mix` -- concat the record from the base and the new record with the same name. It adds only unique information during a concatenation process.
-4. `edit` -- edit a record specified by a name in the base
-5. `del` -- delete a record specified by a name from the base
-6. `clr` -- clear all fields of the Interface
-7. `last` -- load the tast record
-8. `tree` -- shows the base in a tree-view format (experimental)
-9. `load` -- load/reload base to work with (example: "load js")
-10. `exit` -- close the program
+4. `get` -- load a record by a name (example: `load info`)
+5. `last` -- load the last edited record
+6. `edit` -- edit a record by a name
+7. `del` -- delete a record by a name
+8. `clr` -- clear all fields of the Interface
+9. `tree` -- show the base or a record in a tree-view structure
+10. `load` -- load/reload base to work with (example: `load js`)
+11. `exit` -- close the program
 
 .
 
