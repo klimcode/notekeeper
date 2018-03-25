@@ -93,15 +93,16 @@ The Tags parsed from Database will be shown it the last field. Their goal is to 
 
 1. Empty command -- do nothing
 2. `add` -- save the current note to the base
-3. `mix` -- concat the record from the base and the new record with the same name. It adds only unique information during a concatenation process.
-4. `get` -- load a record by a name (example: `load info`)
-5. `last` -- load the last edited record
-6. `edit` -- edit a record by a name
-7. `del` -- delete a record by a name
-8. `clr` -- clear all fields of the Interface
-9. `tree` -- show the base or a record in a tree-view structure
-10. `load` -- load/reload base to work with (example: `load js`)
-11. `exit` -- close the program
+3. `mul` -- add multiple comma-separated records to the base (example: mul a, b,c). All the names must be unique.
+4. `mix` -- concat the record from the base and the new record with the same name. It adds only unique information during a concatenation process.
+5. `get` -- load a record by a name (example: `load info`)
+6. `last` -- load the last edited record
+7. `edit` -- edit a record by a name
+8. `del` -- delete a record by a name
+9. `clr` -- clear all fields of the Interface
+10. `tree` -- show the base or a record in a tree-view structure
+11. `load` -- load/reload base to work with (example: `load js`)
+12. `exit` -- close the program
 
 .
 

@@ -39,7 +39,7 @@ FLOW.steps = {
     'user entered something': [ executeCommands, test ],
 
     // base/config modifications
-    'user added/edited a record': updateBaseFile,
+    'user added/edited records': updateBaseFile,
     'base file is updated': nope,
     'user wants to load another base': switchBase,
     'notekeeper is prepared for base loading': getBase,
@@ -331,6 +331,7 @@ function executeCommands(interface) {
     const commandsList = {
         '': command_empty,
         'add': command_add,
+        'mul': command_addMultiple,
         'mix': command_mix,
         'get': command_getRecord,
         'edit': command_edit,
@@ -394,6 +395,24 @@ function executeCommands(interface) {
         } else { // the Name is already existed in the Base
             message ('existsMix', name);
             commandLine = 'mix';
+        }
+    }
+    function command_addMultiple(args) {
+        const names = UTIL.prettifyList (args.join(' '));
+        const namesUsed = names.filter (n => -1 !== UTIL.searchName (base, n));
+
+        if (namesUsed.length) {
+            message ('namesUsed', namesUsed.join(', '));
+        } else {
+            interface.text = interface.text || '...';
+
+            if (interface.tags.length) {
+                const firstTag = interface.tags[0];
+                commandLine = 'tree '+ firstTag;
+            }
+
+            pushSeveralRecordsToBase (names);
+            message ('mulAdded', names.join(', '));
         }
     }
     function command_mix() {
@@ -556,6 +575,7 @@ function executeCommands(interface) {
                 empty: `THE TEXT FIELD IS EMPTY. \nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
                 newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
                 newNamed: `NEW RECORD NAMED "${$1}" \nWAS PUSHED TO THE BASE.`,
+                mulAdded: `NEW RECORDS: "${$1}" \nWERE PUSHED TO THE BASE.`,
                 existsMix: `A RECORD NAMED "${$1}" \nALREADY EXISTS. \nMIX WITH IT?`,
                 mixed: `RECORDS NAMED "${$1}" \nWERE MIXED.`,
                 edited: `A RECORD NAMED "${$1}" \nWAS SUCCESSFULLY EDITED.`,
@@ -567,6 +587,7 @@ function executeCommands(interface) {
                 whatToRename: `WHAT RECORD MUST BE RENAMED?`,
                 whatNewName: `WHAT A NEW NAME FOR THIS RECORD?`,
                 nameUsed: `A NAME "${$1}" IS ALREADY USED`,
+                namesUsed: `THESE NAMES ARE USED ALREADY: "${$1}"`,
                 notFound: `A RECORD NAMED "${$1}" IS NOT FOUND`,
 
                 baseNotFound: `BASE "${$1}" \nIS NOT FOUND`,
@@ -577,6 +598,7 @@ function executeCommands(interface) {
                 treeError: `ERROR IN TREE-VIEW! \n${$1} \nCAN BE FIXED MANUALLY`,
                 treeTime: `"Tree generation time: ${$1}ms"`,
 
+                _: `$1 \n$2 \n$3`,
                 demo: `SORRY, THIS FUNCTION WILL WORK IN FUTURE VERSIONS. \nCHECK A NEW VERSION OF NOTEKEEPER.`,
             };
             if (!code) {
@@ -604,11 +626,22 @@ function executeCommands(interface) {
         }
         function pushNewRecordToBase () { // TODO: move this out
             G.base.data.push ( baseParser.filterObject (interface) );
-            FLOW.done ('user added/edited a record');
+            FLOW.done ('user added/edited records');
+        }
+        function pushSeveralRecordsToBase (names) { // TODO: move this out
+            names.forEach (name => {
+                const record = {
+                    name,
+                    tags: interface.tags,
+                    text: interface.text
+                };
+                G.base.data.push (record);
+            });
+            FLOW.done ('user added/edited records');
         }
         function deleteBaseRecord (index) { // TODO: move this out
             base.splice (index, 1);
-            FLOW.done ('user added/edited a record');
+            FLOW.done ('user added/edited records');
         }
 }
 function updateBaseFile() { // Mutates a Base File !
