@@ -590,7 +590,7 @@ function executeCommands(interface) {
             const victim = tree[0];
 
             commandLine = 'edit';
-            message ('treeError', tree.error);
+            message ('treeError', tree.error.toLowerCase());
             placeRecordToInterface (victim);
             return;
         }
@@ -649,7 +649,7 @@ function executeCommands(interface) {
                 baseSwitched: `BASE IS SWITCHED TO "${$1}"`,
                 baseReloaded: `THE BASE IS RELOADED.`,
 
-                treeError: `ERROR IN TREE-VIEW! \nCIRCULAR LINK FOUND IN RECORDS: "${$1}" \nCAN BE FIXED MANUALLY.`,
+                treeError: `ERROR IN TREE-VIEW! \nCIRCULAR LINK: "${$1}" \nCAN BE FIXED MANUALLY.`,
                 treeTime: `"Tree generation time: ${$1}ms"`,
 
                 _: `$1 \n$2 \n$3`,

@@ -88,7 +88,7 @@ module.exports = {
             setChild (record, base);  // register the record in each parent's record as a child
         });
 
-        checkCircular (base.root);
+        checkCircular (base['root']);
         sortChildren (specifiedRoot, base);
         makeTree (specifiedRoot, base, tree);
         clearBaseIds (base);
@@ -121,82 +121,49 @@ module.exports = {
             }
         }
         
-        /*
-        function setLevels (specifiedRoot, base) {
+        function checkCircular (node) {
             if (isCircular) return;
-
-            let level = specifiedRoot.level || 0;
-            if (!specifiedRoot.level && specifiedRoot._id >= 0) { // not a global Root. It will be shown.
-                level = 1;
-            }
-            if (!specifiedRoot._childrenIds) return tree; // exit from a recursion
-
-
-            if (level > 100) { // Catching circular links
-                loop.push ({name: specifiedRoot.name, parents: specifiedRoot.tags, id: specifiedRoot._id});
-            }
-            if (level > 106) {
-                if (loop.findIndex (e => e.name === specifiedRoot.name) >= 0) {
-                    isCircular = true;
-                    console.error ('Circular link is found!');
-
-                    const victim = loop.find (record => { // searching a record with a parent which is outside of the loop
-                        return record.parents.find (parent => {
-                            const found = loop.find (e => isEqual (e.name, parent));
-                            console.log(found);
-                            if (!found) return true; 
-                        });
-                    });
-                    const errorTags = victim.parents.filter (parent => { // wrong tag
-                        return loop.find (e => isEqual (e.name, parent))
-                    });
-
-
-                    tree = [ base[victim.id] ];
-                    tree.error = errorTags.join(', ');
-                    return;
-                }
-            }
+            let children = node._childrenIds;
 
             
-            specifiedRoot._childrenIds.forEach (childId => { // set children levels
-                let child = base[childId];
-                child.level = level + 1;
-
-                setLevels (child, base);
-            });
-        }
-        */
-        
-        function checkCircular (node) {
-            const newStackTop = {id: node._id, i: 0};
-            let stackTop = stack[stack.length-1];
-
-            if (!stackTop) stack.push (newStackTop); // root
-
-            let children = node._childrenIds;
             if (children) {
-                if (stackTop.id !== node.id) {
-                    stack.push (newStackTop)
-                }
-                if (children.length > stackTop.i) {
-                    const nextChildId = children[stackTop.i];
-                    const nextChild = base[nextChildId];
-                    checkCircular (nextChild);
-                    return;
-                } else {
-                    stack.pop();
-                }
-            }
-            stackTop.i++;
-            const parentId = stackTop.id;
-            const parent = base[parentId];
-            checkCircular (parent);
+                console.log(node.name);
+                const newStackTop = {id: node._id, i: 0};
+                if (!stack.length) stack.push (newStackTop); // root
+                
+                if (stack[stack.length-1].id !== node._id) {
+                    const victimIndex = 1 + stack.findIndex (e => e.id === newStackTop.id);
+                    if (victimIndex) {
+                        // debugger;
+                        isCircular = true;
+                        const victimId = stack[victimIndex].id;
+                        const errorLinkId = stack[victimIndex-1].id;
 
-            if (stack.length > 30) debugger;
+                        tree = [ base[victimId] ];
+                        tree.error = base[errorLinkId].name;
+                        console.error ('Circular link is found!');
+                        return;
+                    }
+
+                    stack.push (newStackTop);
+                }
+                let stackTop = stack[stack.length-1];
+                
+                while (children.length > stackTop.i) {
+                    const childId = children[stackTop.i];
+                    const child = base[childId];
+                    
+                    stackTop.i++;
+                    checkCircular (child);
+                }
+
+                stack.pop();
+            }
         }
 
         function sortChildren (specifiedRoot, base) {
+            if (isCircular) return;
+
             let children = specifiedRoot._childrenIds;
             if (!children) return;
 
