@@ -332,6 +332,7 @@ function executeCommands(interface) {
         '': command_empty,
         'add': command_add,
         'mul': command_addMultiple,
+        'adopt': command_adopt,
         'mix': command_mix,
         'get': command_getRecord,
         'edit': command_edit,
@@ -353,7 +354,7 @@ function executeCommands(interface) {
         ERR ('Error in a command '+ command);
         console.log(e);
     }
-    interface.command = commandLine + (msg ? "\n" + msg : ""); // Show messages under the command field
+    interface.command = commandLine + (msg ? "\n\n" + msg : ""); // Show messages under the command field
     FLOW.done ("new data to display for user", interface);
 
 
@@ -374,12 +375,12 @@ function executeCommands(interface) {
         const name = args[0] || interface.name;
         const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
+        interface.name = name;
         if (index === -1) { // the Base does not have a Record with the Name specified
             if (args[0]) {
                 const tagsFromArgs = args.slice(1).join(' ');
                 if (tagsFromArgs) interface.tags = tagsFromArgs;
                 if (!interface.text) interface.text = '...';
-                interface.name = name;
             }
 
             if (!interface.text) {
@@ -400,19 +401,48 @@ function executeCommands(interface) {
     function command_addMultiple(args) {
         const names = UTIL.prettifyList (args.join(' '));
         const namesUsed = names.filter (n => -1 !== UTIL.searchName (base, n));
+        const namesToAdd = names.filter (n => -1 === UTIL.searchName (base, n));
 
-        if (namesUsed.length) {
-            message ('namesUsed', namesUsed.join(', '));
-        } else {
+        if (namesToAdd.length) {
             interface.text = interface.text || '...';
-
+            
             if (interface.tags.length) {
                 const firstTag = interface.tags[0];
                 commandLine = 'tree '+ firstTag;
             }
+            
+            pushSeveralRecordsToBase (namesToAdd);
+            message ('mulAdded', namesToAdd.join(', '));
+        } else {
+            message ('noAdd');
+        }
 
-            pushSeveralRecordsToBase (names);
-            message ('mulAdded', names.join(', '));
+        if (namesUsed.length) {
+            message ('+namesUsed', namesUsed.join(', '), interface.tags.join(', '));
+            commandLine = 'adopt '+ namesUsed.join(', ');
+        } 
+    }
+    function command_adopt(args) {
+        const names = UTIL.prettifyList (args.join(' '));
+        const namesUsed = names.filter (n => -1 !== UTIL.searchName (base, n));
+        const namesToAdd = names.filter (n => -1 === UTIL.searchName (base, n));
+
+        if (namesUsed.length) { // There records will be abopted
+            namesUsed.forEach (name => {
+                const adopted = base[UTIL.searchName (base, name)];
+                adopted.tags = UTIL.concatUniqTags (adopted.tags, interface.tags);
+            });
+
+            commandLine = 'tree '+ interface.tags[0];
+            message ('adopted', namesUsed.join(', '), interface.tags.join(', '));
+            FLOW.done ('user added/edited records');
+        } else {
+            message ('noAdopted');
+        }
+        
+        if (namesToAdd.length) { // There records will be offered to add
+            commandLine = 'mul '+ namesToAdd.join(', ');    
+            message ('+addMul', namesToAdd.join(', '));
         }
     }
     function command_mix() {
@@ -435,7 +465,11 @@ function executeCommands(interface) {
         if (index === -1) { // The Base does not have a Record with a Name specified
             message ('addNew');
             commandLine = 'add';
-        } else { // The base has already had a record with the same name as specified
+        } else { // The Record is found and may be edited
+            if (!interface.text) {
+                message ('empty')
+                return;
+            }
             message ('edited', name);
             deleteBaseRecord (index);
             pushNewRecordToBase ();
@@ -480,7 +514,7 @@ function executeCommands(interface) {
         commandLine = 'edit';
     }
 
-    function command_rename(args) { // NOT FINISHED YET
+    function command_rename(args) {
         const oldName = interface.name;
         if (!oldName) {
             message ('whatToRename');
@@ -500,11 +534,21 @@ function executeCommands(interface) {
             message ('nameUsed', newName);
             return;
         }
-        
-        // It must rename a record and all links to it
+
+        let record = base[recordId];
+        record.name = newName;
+
+        base.forEach (rec => { // Renaming all links to the Record
+            const tagIndex = rec.tags.findIndex (tag => UTIL.isEqual (tag, oldName));
+            if (tagIndex !== -1) {
+                rec.tags[tagIndex] = newName;
+            }
+        });
 
         
-        message ('demo');
+        commandLine = 'tree '+ newName;
+        message ('renamed', newName, oldName);
+        FLOW.done ('user added/edited records');
     }
     function command_loadBase(args) {
         if (args[0]) {
@@ -551,6 +595,11 @@ function executeCommands(interface) {
             return;
         }
 
+        if (rootId !== undefined) {
+            const rootRecord = tree[0];
+            rootRecord.name += '    //of: '+ rootRecord.parentNames.join(', ');
+        }
+
         const treeString = G.view.treeParser.stringify (tree, indent);
         interface.text = treeString;
         message ('treeTime', UTIL.clock (time));
@@ -572,7 +621,7 @@ function executeCommands(interface) {
         function message (code, $1, $2, $3) {
             const m = {
                 addNew: `ADD A NEW RECORD TO THE BASE?`,
-                empty: `THE TEXT FIELD IS EMPTY. \nTHIS RECORD WILL NOT BE ADDED TO THE BASE.`,
+                empty: `THE TEXT FIELD IS EMPTY. \nTHIS RECORD CAN NOT BE ADDED TO THE BASE.`,
                 newNoname: `NEW UNNAMED RECORD WAS PUSHED TO THE BASE.`,
                 newNamed: `NEW RECORD NAMED "${$1}" \nWAS PUSHED TO THE BASE.`,
                 mulAdded: `NEW RECORDS: "${$1}" \nWERE PUSHED TO THE BASE.`,
@@ -582,20 +631,25 @@ function executeCommands(interface) {
                 deleted: `A RECORD NAMED "${$1}" \nWAS DELETED.`,
                 wrongCommand: `A COMMAND "${$1}" DOES NOT WORK.`,
 
-                last: `THIS IS THE LATEST EDITED RECORD`,
+                last: `THIS IS THE LATEST EDITED RECORD.`,
                 whatToShow: `WHAT A NAME OF A RECORD TO SHOW?`,
                 whatToRename: `WHAT RECORD MUST BE RENAMED?`,
                 whatNewName: `WHAT A NEW NAME FOR THIS RECORD?`,
-                nameUsed: `A NAME "${$1}" IS ALREADY USED`,
-                namesUsed: `THESE NAMES ARE USED ALREADY: "${$1}"`,
-                notFound: `A RECORD NAMED "${$1}" IS NOT FOUND`,
+                nameUsed: `A NAME "${$1}" IS ALREADY USED.`,
+                namesUsed: `THESE NAMES ARE USED ALREADY: "${$1}" \nLET "${$2}" ADOPT THEM?`,
+                noAdd: `NO RECORDS WERE ADDED TO THE BASE.`,
+                adopted: `THESE RECORDS: "${$1}" WERE ADOPTED BY: "${$2}"`,
+                noAdopted: `RECORDS THOSE DON'T EXIST CAN NOT BE ADOPTED.`,
+                addMul: `ADD THESE RECORDS: "${$1}" \nTO THE BASE?`,
+                notFound: `A RECORD NAMED "${$1}" IS NOT FOUND.`,
+                renamed: `THE NAME IS CHANGED TO "${$1}". \nTHE OLD NAME WAS "${$2}"`,
 
-                baseNotFound: `BASE "${$1}" \nIS NOT FOUND`,
-                baseUsed: `BASE "${$1}" \nIS USED RIGHT NOW`,
+                baseNotFound: `BASE "${$1}" \nIS NOT FOUND.`,
+                baseUsed: `BASE "${$1}" \nIS USED RIGHT NOW.`,
                 baseSwitched: `BASE IS SWITCHED TO "${$1}"`,
-                baseReloaded: `THE BASE IS RELOADED`,
+                baseReloaded: `THE BASE IS RELOADED.`,
 
-                treeError: `ERROR IN TREE-VIEW! \n${$1} \nCAN BE FIXED MANUALLY`,
+                treeError: `ERROR IN TREE-VIEW! \nCIRCULAR LINK FOUND IN RECORDS: "${$1}" \nCAN BE FIXED MANUALLY.`,
                 treeTime: `"Tree generation time: ${$1}ms"`,
 
                 _: `$1 \n$2 \n$3`,
@@ -605,8 +659,15 @@ function executeCommands(interface) {
                 msg = '';
                 return;
             }
+            if (code[0] === '+') {
+                code = code.slice(1);
+                msg += '\n\n';
+            } else {
+                msg = '';
+            }
+
             if (m[code]) {
-                msg = m[code];
+                msg += m[code];
             }
             else {
                 msg = `Message with code ${code} is not found`;
@@ -624,11 +685,11 @@ function executeCommands(interface) {
             interface.tags = UTIL.concatUniqTags (baseRecord.tags, interface.tags);
             interface.text = UTIL.concatUniqText (baseRecord.text, interface.text);
         }
-        function pushNewRecordToBase () { // TODO: move this out
+        function pushNewRecordToBase () {
             G.base.data.push ( baseParser.filterObject (interface) );
             FLOW.done ('user added/edited records');
         }
-        function pushSeveralRecordsToBase (names) { // TODO: move this out
+        function pushSeveralRecordsToBase (names) {
             names.forEach (name => {
                 const record = {
                     name,
@@ -639,7 +700,7 @@ function executeCommands(interface) {
             });
             FLOW.done ('user added/edited records');
         }
-        function deleteBaseRecord (index) { // TODO: move this out
+        function deleteBaseRecord (index) {
             base.splice (index, 1);
             FLOW.done ('user added/edited records');
         }

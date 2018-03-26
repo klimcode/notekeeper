@@ -72,20 +72,23 @@ module.exports = {
     buildTree (base, rootId) {
         const isEqual = this.isEqual;
         let tree = [];  
-        let rootRecord = { _childrenIds: [] };
-        let specifiedRoot = rootId===null ? rootRecord : base[rootId];
+        let rootRecord = { name: 'root', _childrenIds: [] };
+        // specifiedRoot -- a root specified by a command like "tree js" (not the main root)
+        let specifiedRoot = rootId==null ? rootRecord : base[rootId];
         let isCircular = false;
-        let loop = [];
+        let stack = [];
 
 
+        base.root = rootRecord;
+        specifiedRoot.level = 0;
         base.forEach ((record, i) => { // set IDs, parents and children
             if (!record.text.trim()) return; // jump over empty records
             record._id = i;
             record._parentsIds = getParentsIds (record.tags, base);  // find Ids of all parents (tags)
-            setChild (record, base, rootRecord);  // register the record in each parent's record as a child
+            setChild (record, base);  // register the record in each parent's record as a child
         });
 
-        setLevels (specifiedRoot, base);
+        checkCircular (base.root);
         sortChildren (specifiedRoot, base);
         makeTree (specifiedRoot, base, tree);
         clearBaseIds (base);
@@ -96,7 +99,7 @@ module.exports = {
 
         function getParentsIds (parents, base) {
             let len = parents.length;
-            if (!len || !parents[0]) return ['rootRecord'];
+            if (!len || !parents[0]) return ['root'];
 
             let parentIds = Array (len);
             for (let i=0; i<len; i++) {
@@ -104,19 +107,21 @@ module.exports = {
                 let id = base.findIndex (e => isEqual (e.name, tag));
 
                 if (id !== -1) parentIds[i] = id;
-                else parentIds[i] = 'rootRecord'; 
+                else parentIds[i] = 'root'; 
             };
             return parentIds;
         }
-        function setChild (record, base, rootRecord) {
+        function setChild (record, base) {
             let parents = record._parentsIds;
             for (let i=0; i<parents.length; i++) {
                 let parentId = parents[i];
-                let parent = parentId === 'rootRecord' ? rootRecord : base[parentId];
+                let parent = base[parentId];
                 if (!parent._childrenIds) parent._childrenIds = [record._id];
                 else parent._childrenIds.push (record._id);
             }
         }
+        
+        /*
         function setLevels (specifiedRoot, base) {
             if (isCircular) return;
 
@@ -130,14 +135,15 @@ module.exports = {
             if (level > 100) { // Catching circular links
                 loop.push ({name: specifiedRoot.name, parents: specifiedRoot.tags, id: specifiedRoot._id});
             }
-            if (level > 110) {
+            if (level > 106) {
                 if (loop.findIndex (e => e.name === specifiedRoot.name) >= 0) {
                     isCircular = true;
                     console.error ('Circular link is found!');
 
-                    const victim = loop.find (record => { // searching a record with an error
+                    const victim = loop.find (record => { // searching a record with a parent which is outside of the loop
                         return record.parents.find (parent => {
-                            const found = loop.find (e => isEqual (e.name, parent))
+                            const found = loop.find (e => isEqual (e.name, parent));
+                            console.log(found);
                             if (!found) return true; 
                         });
                     });
@@ -147,10 +153,11 @@ module.exports = {
 
 
                     tree = [ base[victim.id] ];
-                    tree.error = `CIRCULAR LINK: "${errorTags.join(', ')}"`;
+                    tree.error = errorTags.join(', ');
                     return;
                 }
             }
+
             
             specifiedRoot._childrenIds.forEach (childId => { // set children levels
                 let child = base[childId];
@@ -159,13 +166,41 @@ module.exports = {
                 setLevels (child, base);
             });
         }
-        function sortChildren (specifiedRoot, base) {
-            if (isCircular) return;
+        */
+        
+        function checkCircular (node) {
+            const newStackTop = {id: node._id, i: 0};
+            let stackTop = stack[stack.length-1];
 
+            if (!stackTop) stack.push (newStackTop); // root
+
+            let children = node._childrenIds;
+            if (children) {
+                if (stackTop.id !== node.id) {
+                    stack.push (newStackTop)
+                }
+                if (children.length > stackTop.i) {
+                    const nextChildId = children[stackTop.i];
+                    const nextChild = base[nextChildId];
+                    checkCircular (nextChild);
+                    return;
+                } else {
+                    stack.pop();
+                }
+            }
+            stackTop.i++;
+            const parentId = stackTop.id;
+            const parent = base[parentId];
+            checkCircular (parent);
+
+            if (stack.length > 30) debugger;
+        }
+
+        function sortChildren (specifiedRoot, base) {
             let children = specifiedRoot._childrenIds;
             if (!children) return;
 
-            children.sort((a,b) => base[a].name > base[b].name ? 1 : -1)
+            children.sort ((a,b) => base[a].name > base[b].name ? 1 : -1)
 
             children.forEach (childId => {                
                 sortChildren (base[childId], base);
@@ -174,20 +209,28 @@ module.exports = {
         function makeTree (specifiedRoot, base, tree) {
             if (isCircular) return;
 
-            let level = 0;
-            if (specifiedRoot.level) level = specifiedRoot.level; // recursion level
-            else if (specifiedRoot._id) { // this record is not a global Root. It will be shown.
+            let level = specifiedRoot.level || 0;
+            if (!specifiedRoot.level && specifiedRoot._id >= 0) { // not a global Root. It will be shown.
                 level = 1;
+            }
+
+            // Only base.root does not have an "_id" property
+            // SpecifiedRoot has "_id" and it differs it from the base.root
+            if (specifiedRoot.level === 0 && specifiedRoot._id != undefined) {
+                const parentNames = specifiedRoot
+                    ._parentsIds.map (id => base[id].name);
+
                 tree.push ({
                     name: specifiedRoot.name,
                     text: specifiedRoot.text,
                     modifier: 1,
+                    parentNames,
                 });
             }
             
-            if (!specifiedRoot._childrenIds) return tree;
+            if (!specifiedRoot._childrenIds) return tree; // no children? finish it
 
-            specifiedRoot._childrenIds.forEach (childId => { // getting levels of children
+            specifiedRoot._childrenIds.forEach (childId => { // pushing children
                 let child = base[childId];
                 child.level = level + 1;
 
@@ -213,6 +256,6 @@ module.exports = {
         G.isLogging && console.log ('\x1b[2m%s\x1b[0m', msg);
     },
     ERR (msg) {
-        console.log ('\x1b[31m%s\x1b[0m', msg);
+        console.error ('\x1b[31m%s\x1b[0m', msg);
     },
 }
