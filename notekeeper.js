@@ -346,11 +346,11 @@ function executeCommands(interface) {
     };
 
 
-    LOG ('executing command: '+ command);
+    LOG ('executing command: '+ commandLine);
     try {
         commandsList[command](commandArgs);
     } catch (e) {
-        message ('wrongCommand', command);
+        message ('errorCommand', command);
         ERR ('Error in a command '+ command);
         console.log(e);
     }
@@ -611,7 +611,8 @@ function executeCommands(interface) {
             return string
                 .split ('\n')
                 .map ((line, i) => padding + ( i>0 ? '  ' : '' ) + line) // additional padding for non-first lines
-                .join ('\n') + '\n';
+                .join ('\n')
+                .replace (/[ |\n]*$/, '') + '\n\n';  // Trim right + fix gap between records
         }
     }
 
@@ -629,8 +630,7 @@ function executeCommands(interface) {
                 mixed: `RECORDS NAMED "${$1}" \nWERE MIXED.`,
                 edited: `A RECORD NAMED "${$1}" \nWAS SUCCESSFULLY EDITED.`,
                 deleted: `A RECORD NAMED "${$1}" \nWAS DELETED.`,
-                wrongCommand: `A COMMAND "${$1}" DOES NOT WORK.`,
-
+                
                 last: `THIS IS THE LATEST EDITED RECORD.`,
                 whatToShow: `WHAT A NAME OF A RECORD TO SHOW?`,
                 whatToRename: `WHAT RECORD MUST BE RENAMED?`,
@@ -643,16 +643,17 @@ function executeCommands(interface) {
                 addMul: `ADD THESE RECORDS: "${$1}" \nTO THE BASE?`,
                 notFound: `A RECORD NAMED "${$1}" IS NOT FOUND.`,
                 renamed: `THE NAME IS CHANGED TO "${$1}". \nTHE OLD NAME WAS "${$2}"`,
-
+                
                 baseNotFound: `BASE "${$1}" \nIS NOT FOUND.`,
                 baseUsed: `BASE "${$1}" \nIS USED RIGHT NOW.`,
                 baseSwitched: `BASE IS SWITCHED TO "${$1}"`,
                 baseReloaded: `THE BASE IS RELOADED.`,
-
+                
                 treeError: `ERROR IN TREE-VIEW! \nCIRCULAR LINK: "${$1}" \nCAN BE FIXED MANUALLY.`,
                 treeTime: `"Tree generation time: ${$1}ms"`,
-
+                
                 _: `$1 \n$2 \n$3`,
+                errorCommand: `A COMMAND "${$1}" DOES NOT WORK.`,
                 demo: `SORRY, THIS FUNCTION WILL WORK IN FUTURE VERSIONS. \nCHECK A NEW VERSION OF NOTEKEEPER.`,
             };
             if (!code) {
