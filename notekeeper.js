@@ -372,7 +372,8 @@ function executeCommands(interface) {
     }
 
     function command_add(args) {
-        const name = args[0] || interface.name;
+        const names = UTIL.prettifyList (args.join(' '));
+        const name = names[0] || interface.name;
         const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
         interface.name = name;
@@ -459,7 +460,8 @@ function executeCommands(interface) {
         }
     }
     function command_edit(args) {
-        const name = args[0] || interface.name;
+        const names = UTIL.prettifyList (args.join(' '));
+        const name = names[0] || interface.name;
         const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
         if (index === -1) { // The Base does not have a Record with a Name specified
@@ -475,8 +477,9 @@ function executeCommands(interface) {
             pushNewRecordToBase ();
         }
     }
-    function command_delete(args) {
-        const name = args[0] || interface.name;
+    function command_delete(args) { // TODO delete multiple records
+        const names = UTIL.prettifyList (args.join(' '));
+        const name = names[0] || interface.name;
         const index = UTIL.searchName (base, name); // check if the Name is existed in the Base
 
         if (index === -1) { // the Base does not have a Record with the Name specified
@@ -489,7 +492,8 @@ function executeCommands(interface) {
     }
 
     function command_getRecord(args) {
-        const name = args[0] || interface.name;
+        const names = UTIL.prettifyList (args.join(' '));
+        const name = names[0] || interface.name;
         if (!name) {
             message ('whatToShow');
             return;
@@ -529,7 +533,9 @@ function executeCommands(interface) {
             message ('whatNewName');
             return;
         }
-        const newName = args[0];
+
+        const names = UTIL.prettifyList (args.join(' '));
+        const newName = names[0] || interface.name;
         if (UTIL.searchName (base, newName) !== -1) {
             message ('nameUsed', newName);
             return;
@@ -565,7 +571,7 @@ function executeCommands(interface) {
                     UTIL.swap(config.bases, 0, baseIndex);
                     config.pathToBase = config.bases[0].path;
 
-                    commandLine = 'add';
+                    commandLine = 'tree';
                     message('baseSwitched', alias);
                     FLOW.done('user wants to load another base', config);
                 }
@@ -578,7 +584,8 @@ function executeCommands(interface) {
     }
     function command_tree(args) {
         const time = UTIL.clock();
-        const rootName = args[0];
+        const names = UTIL.prettifyList (args.join(' '));
+        const rootName = names[0];
         const rootId = rootName ? UTIL.searchName (base, rootName) : null;
         if (rootId === -1) {
             message ('notFound', rootName);
