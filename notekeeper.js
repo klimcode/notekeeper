@@ -595,7 +595,7 @@ function executeCommands(interface) {
             return;
         }
 
-        if (rootId !== undefined) {
+        if (rootId != null) {
             const rootRecord = tree[0];
             rootRecord.name += '    //of: '+ rootRecord.parentNames.join(', ');
         }

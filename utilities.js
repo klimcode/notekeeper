@@ -127,7 +127,6 @@ module.exports = {
 
             
             if (children) {
-                console.log(node.name);
                 const newStackTop = {id: node._id, i: 0};
                 if (!stack.length) stack.push (newStackTop); // root
                 

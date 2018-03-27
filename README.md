@@ -81,7 +81,7 @@ The first line is intended for the text of your new Note.
 
 A Line under the "**name**" delimeter is a field to enter the name of your Note. It's not required but makes it possible to edit and delete notes later using a name as an identifier. Names must be unique. It's a **single-line field**.
 
-The "**tags**" field may be used to add a list of tags (marks, categories, parents...) to your new note. Tags are not required. It's a **single-line field**.
+The "**tags**" field may be used to add a list of tags (or marks, categories, parents...) to your new note. Tags are not required. It's a **single-line field**.
 
 The "**commands**" field accepts commands for Notekeeper. There also messages appear. A command is a single-line field. Other lines are ignored.
 
@@ -93,16 +93,18 @@ The Tags parsed from Database will be shown it the last field. Their goal is to 
 
 1. Empty command -- do nothing
 2. `add` -- save the current note to the base
-3. `mul` -- add multiple comma-separated records to the base (example: mul a, b,c). All the names must be unique.
+3. `mul` -- add multiple comma-separated records to the base (example: mul a, b,c). The unique names will be added to the Base and non-unique ones will be offered to adoption.
 4. `mix` -- concat the record from the base and the new record with the same name. It adds only unique information during a concatenation process.
 5. `get` -- load a record by a name (example: `load info`)
-6. `last` -- load the last edited record
+6. `last` -- load the last added/edited record
 7. `edit` -- edit a record by a name
 8. `del` -- delete a record by a name
-9. `clr` -- clear all fields of the Interface
-10. `tree` -- show the base or a record in a tree-view structure
-11. `load` -- load/reload base to work with (example: `load js`)
-12. `exit` -- close the program
+9. `ren` -- rename a record
+10. `adopt` -- add new parents to records enlisted in the commang arguments (example: adopt rec1, rec2, rec3)
+11. `clr` -- clear all fields of the Interface
+12. `tree` -- show the base or a record in a tree-view structure
+13. `load` -- load/reload base to work with (example: `load js`)
+14. `exit` -- close the program
 
 .
 
