@@ -6,7 +6,7 @@
     const FILE = require('fs-handy-wraps');
     const PARSER = require('parser-template');
     const UTIL = require('./utilities');
-    const {LOG, ERR} = require('./utilities');
+    const {LOG, ERR} = UTIL;
 
     global.G = {
         firstStart: false,
@@ -154,6 +154,7 @@ function parseBase() {
 
     data = data instanceof Array ? data : [data]; // if Parser returned only one Record object -> enforce it to be an array.
     data.forEach (record => record.tags = record.tags.trim().split (', ')); // convert tags to Array
+    data = data.filter (record => record.text.trim()); // remove empty records
 
     G.base.data = data;
     
@@ -577,7 +578,7 @@ function executeCommands(interface) {
                 }
             }
         } else {
-            commandLine = 'add';
+            commandLine = 'tree';
             message('baseReloaded');
             FLOW.done('notekeeper is prepared for base loading');
         }
@@ -595,16 +596,21 @@ function executeCommands(interface) {
         const tree = UTIL.buildTree (base, rootId);
         if (tree.error) {
             const victim = tree[0];
+            if (!victim) {
+                message ('treeErrorNoRoot');
+                commandLine = 'get';
+                return;
+            }
 
             commandLine = 'edit';
-            message ('treeError', tree.error.toLowerCase());
+            message ('treeErrorCirc', tree.error.toLowerCase());
             placeRecordToInterface (victim);
             return;
         }
 
         if (rootId != null) {
             const rootRecord = tree[0];
-            rootRecord.name += '    //of: '+ rootRecord.parentNames.join(', ');
+            rootRecord.name += '    //of: '+ rootRecord.tags.join(', ');
         }
 
         const treeString = G.view.treeParser.stringify (tree, indent);
@@ -656,7 +662,8 @@ function executeCommands(interface) {
                 baseSwitched: `BASE IS SWITCHED TO "${$1}"`,
                 baseReloaded: `THE BASE IS RELOADED.`,
                 
-                treeError: `ERROR IN TREE-VIEW! \nCIRCULAR LINK: "${$1}" \nCAN BE FIXED MANUALLY.`,
+                treeErrorCirc: `ERROR IN TREE-VIEW! \nCIRCULAR LINK: "${$1}" \nSHOULD BE DELETED MANUALLY.`,
+                treeErrorNoRoot: `ERROR IN TREE-VIEW! \nROOT RECORD IS NOT FOUND.`,
                 treeTime: `"Tree generation time: ${$1}ms"`,
                 
                 _: `$1 \n$2 \n$3`,
