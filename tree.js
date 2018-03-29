@@ -89,10 +89,10 @@ function checkCircular (node, tree, stack, result) {
 }
 function sortChildren (node, tree, compareChildren) {
     if (tree.isCircular) return;
-
+    
     let children = node.children;
     if (!children) return;
-
+    
     if (children.length > 1) children.sort (compareChildren);
 
     children.forEach (childId => {                

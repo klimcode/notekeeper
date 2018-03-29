@@ -705,14 +705,12 @@ function executeCommands(interface) {
             FLOW.done ('user added/edited records');
         }
         function pushSeveralRecordsToBase (names) {
-            names.forEach (name => {
-                const record = {
-                    name,
-                    tags: interface.tags,
-                    text: interface.text
-                };
-                G.base.data.push (record);
-            });
+            for (name of names) {
+                const record = Object.assign ({}, interface);
+                record.name = name;
+
+                G.base.data.push (baseParser.filterObject (record));
+            };
             FLOW.done ('user added/edited records');
         }
         function deleteBaseRecord (index) {

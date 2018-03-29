@@ -90,6 +90,7 @@ module.exports = {
             return isEqual (recordName, tag);
         }
         function compareNodes (indexA, indexB) {
+            console.log(base[indexA].name);
             return base[indexA].name > base[indexB].name ? 1 : -1
         }
     },
