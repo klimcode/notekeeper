@@ -100,9 +100,8 @@ function sortChildren (node, tree, compareChildren) {
     });
 }
 function scanTree (node, tree, result) {
-    if (!node.children) return; // no children? finish it
     if (tree.isCircular) return;
-
+    
     let level = node.level || 0;
     
     // Only tree.root does not have an "id" property
@@ -114,7 +113,8 @@ function scanTree (node, tree, result) {
             level,
         });
     }
-
+    
+    if (!node.children) return; // no children? finish it
     node.children.forEach (childId => { // pushing children
         let child = tree[childId];
         child.level = level + 1;
