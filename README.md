@@ -6,6 +6,9 @@ This is a simple Node.js utility for making notes.
 - Notes are stored in plain text Base files which are easy to read without Notekeeper.
 - Helps you to create hierarchically structured knowledge base for storing any texts containing any symbols.
 
+**Warning**: this software is discontinued. It works, but the author decided to use some ideas from here in the new app **[Knowkeep](https://github.com/klimcode/knowkeep)**.
+The main reason is the name "Notekeeper", it's not unique and was used just for proof-of-concept.
+
 ----
 
 ## Installation

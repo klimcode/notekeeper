@@ -22,20 +22,23 @@
     
 const FLOW = new Flow(G.flowSettings);
 FLOW.steps = {
-    // startup steps
+    // loading steps
     'start': makeHomedir,
     'home directory is OK': getConfig,
     'config is OK': [ getBase, getBaseTemplate, getInterfaceTemplate, getTreeTemplate ],
     'database is OK': parseBase,
     'template for database is OK': parseBase,
+    
+    // signals to VIEW
     'base is parsed': renderInterface,
     'interface is prepared': renderInterface,
-    'interface is ready to use': [ openTextEditor, detectInterfaceChanges ],
-
-    // change detection and interface's health
     'new data to display for user': renderInterface,
     'interface is broken': showErrorMessage,
     'interface is restored by force': renderInterface,
+    
+    // initialization of CONTROLLER
+    'interface is ready to use': [ openTextEditor, detectInterfaceChanges ],
+    // signals from CONTROLLER
     'user entered something': [ executeCommands, test ],
 
     // base/config modifications
@@ -45,7 +48,7 @@ FLOW.steps = {
     'notekeeper is prepared for base loading': getBase,
     'config file is updated': nope,
     
-    // other
+    // termination
     'fatal error': closeApp,
     'finish': closeApp,
 };
@@ -238,6 +241,9 @@ function openTextEditor() {  //return FLOW.done('finish');
     }
     G.view.isEditorOpened = true;
 }
+
+
+// CONTROLLER
 function detectInterfaceChanges() {
     const interfaceFile = G.config.pathToInterface;
     LOG ('detecting changes of Interface File...');
@@ -272,7 +278,7 @@ function detectInterfaceChanges() {
 }
 
 
-// INTERFACE RENDERING
+// INTERFACE RENDERING (VIEW)
 function renderInterface() {
     const pathToInterface = G.config.pathToInterface;
     let base = G.base.data;
